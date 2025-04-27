@@ -11,7 +11,15 @@ export class UsersService {
     @InjectModel(User.name) private readonly userModel: Model<User>,
   ) {}
 
-  async findOne(username: string): Promise<User | undefined | null> {
+  async findOne(
+    username: string,
+    isWithPassword = false,
+  ): Promise<User | undefined | null> {
+    if (isWithPassword)
+      return await this.userModel
+        .findOne({ username })
+        .select('+password')
+        .exec();
     return await this.userModel.findOne({ username });
   }
 }

@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './interfaces/types';
 import { UsersService } from '../users/users.service';
+import { SignInDto, SignInResponseDto } from 'src/modules/auth/Dto/signin.dto';
 
 @Injectable()
 export class AuthService {
@@ -11,21 +12,22 @@ export class AuthService {
     private readonly usersService: UsersService,
     private jwtService: JwtService,
   ) {}
-  async signIn(
-    username: string,
-    pass: string,
-  ): Promise<{ access_token: string }> {
-    const user = await this.usersService.findOne(username);
+  async signIn(signInData: SignInDto): Promise<{ access_token: string }> {
+    const user = await this.usersService.findOne(signInData.username, true);
     if (!user) {
-      this.logger.error(`🚨 Login failed: User ${username} not found`);
+      this.logger.error(
+        `🚨 Login failed: User ${signInData.username} not found`,
+      );
       throw new UnauthorizedException(
         'Tài khoản hoặc mật khẩu không chính xác',
       );
     }
 
-    const match = await bcrypt.compare(pass, user.password);
+    const match = await bcrypt.compare(signInData.password, user.password);
     if (!match) {
-      this.logger.error(`🚨 Login failed: Incorrect password for ${username}`);
+      this.logger.error(
+        `🚨 Login failed: Incorrect password for ${signInData.username}`,
+      );
       throw new UnauthorizedException(
         'Tài khoản hoặc mật khẩu không chính xác',
       );
@@ -33,8 +35,11 @@ export class AuthService {
 
     const payload: JwtPayload = { sub: user._id, username: user.username };
     const access_token = await this.jwtService.signAsync(payload);
-    this.logger.log(`🚀 User ${username} signed in successfully`);
-
-    return { access_token };
+    this.logger.log(`🚀 User ${signInData.username} signed in successfully`);
+    const responseData: SignInResponseDto = {
+      user,
+      access_token,
+    };
+    return responseData;
   }
 }

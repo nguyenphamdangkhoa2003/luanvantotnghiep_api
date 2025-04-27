@@ -3,31 +3,28 @@ import {
   Body,
   Controller,
   Get,
-  HttpCode,
   Logger,
   Post,
   Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthService } from 'src/modules/auth/auth.service';
-import { SignInDto } from 'src/modules/auth/Dto/signin.dto';
 import * as bcrypt from 'bcrypt';
-import { AuthGuard } from 'src/modules/auth/auth.guard';
-import { JwtPayload } from 'src/modules/auth/interfaces/types';
 import { Request } from 'express';
+import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
+import { LocalAuthGuard } from 'src/modules/auth/local-strategy.guard';
 
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name, {
     timestamp: true,
   });
-  constructor(private readonly authService: AuthService) {}
+  constructor() {}
 
-  @HttpCode(200)
-  @Post('login')
-  signIn(@Body() signInDto: SignInDto) {
-    return this.authService.signIn(signInDto.username, signInDto.password);
+  @UseGuards(LocalAuthGuard)
+  @Post('signin')
+  signIn(@Req() req: Request) {
+    return req.user;
   }
   @Get('hash')
   async hash(@Query('str') str: string) {
@@ -41,9 +38,9 @@ export class AuthController {
     return { hash };
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
-  getProfile(@Req() request: Request): JwtPayload {
-    return request.user as JwtPayload;
+  getProfile(@Req() request: Request) {
+    return request.user;
   }
 }
