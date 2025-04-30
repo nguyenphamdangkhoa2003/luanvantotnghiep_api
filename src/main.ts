@@ -1,6 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './core/app.module';
 import { ConsoleLogger, Logger, ValidationPipe } from '@nestjs/common';
+import * as session from 'express-session';
+import { ConfigService } from '@nestjs/config';
+import { CipherKey } from 'crypto';
+import * as passport from 'passport';
 
 const APP_NAME = 'XeShare API';
 const logger = new Logger(APP_NAME, { timestamp: true });
@@ -13,6 +17,20 @@ async function bootstrap() {
         logLevels: ['log'],
       }),
     });
+    const configService = app.get(ConfigService);
+    const sessionOptions: session.SessionOptions = {
+      secret: configService.get<string>('session.secret') as CipherKey,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 360000,
+      },
+    };
+
+    app.use(session(sessionOptions));
+    app.use(passport.initialize());
+    app.use(passport.session());
+
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,

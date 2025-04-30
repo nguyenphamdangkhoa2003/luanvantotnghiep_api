@@ -12,6 +12,24 @@ export class AuthService {
     private readonly usersService: UsersService,
     private jwtService: JwtService,
   ) {}
+  async validateUser({ username, password }: SignInDto) {
+    const user = await this.usersService.findOne(username, true);
+    if (!user) {
+      this.logger.error(`🚨 Login failed: User username} not found`);
+      throw new UnauthorizedException(
+        'Tài khoản hoặc mật khẩu không chính xác',
+      );
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      this.logger.error(`🚨 Login failed: Incorrect password for username}`);
+      throw new UnauthorizedException(
+        'Tài khoản hoặc mật khẩu không chính xác',
+      );
+    }
+    return user;
+  }
   async signIn(signInData: SignInDto): Promise<{ access_token: string }> {
     const user = await this.usersService.findOne(signInData.username, true);
     if (!user) {

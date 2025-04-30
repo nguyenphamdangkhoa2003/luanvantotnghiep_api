@@ -6,7 +6,7 @@ import { plainToClass } from 'class-transformer';
 
 class ConfigSchema {
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy chuỗi kết nối' })
+  @IsNotEmpty({ message: 'Không tìm thấy monogo uri' })
   MONGO_URI: string;
 
   @IsString()
@@ -20,6 +20,14 @@ class ConfigSchema {
   @IsInt()
   @Min(0)
   PORT: number = 3000;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Không tìm thấy jwt expire' })
+  JWT_EXPIRE_IN: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Không tìm thấy session secret' })
+  SECTION_SECRET: string;
 }
 
 export const configModuleOptions: ConfigModuleOptions = {
@@ -49,6 +57,8 @@ export default (): AppConfig => {
     MONGO_URI: process.env.MONGO_URI,
     APP_NAME: process.env.APP_NAME,
     JWT_SECRET: process.env.JWT_SECRET,
+    JWT_EXPIRE_IN: process.env.JWT_EXPIRE_IN,
+    SECTION_SECRET: process.env.SECTION_SECRET,
   });
 
   const errors = validateSync(env, { forbidUnknownValues: true });
@@ -60,8 +70,12 @@ export default (): AppConfig => {
   }
 
   return {
+    session: {
+      secret: env.SECTION_SECRET,
+    },
     jwt: {
       secret: env.JWT_SECRET,
+      expire_in: env.JWT_EXPIRE_IN,
     },
     app: {
       name: env.APP_NAME,

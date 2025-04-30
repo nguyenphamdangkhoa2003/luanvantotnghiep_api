@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Request } from 'express';
-import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
+import { AuthenticatedGuard } from 'src/modules/auth/authenticated.guard';
 import { LocalAuthGuard } from 'src/modules/auth/local-strategy.guard';
 
 @Controller('auth')
@@ -38,9 +38,20 @@ export class AuthController {
     return { hash };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AuthenticatedGuard)
   @Get('profile')
   getProfile(@Req() request: Request) {
     return request.user;
+  }
+
+  @UseGuards(LocalAuthGuard)
+  @Post('logout')
+  logout(@Req() req: Request) {
+    console.log('working ....');
+    return req.logout((err) => {
+      if (err) {
+        throw new Error('Logout failed');
+      }
+    });
   }
 }
