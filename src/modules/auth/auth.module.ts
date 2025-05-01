@@ -7,7 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { LocalStrategy } from 'src/modules/auth/strategies/local.strategy';
 import { PassportModule } from '@nestjs/passport';
 import { SessionSerializer } from 'src/modules/auth/session.serializer';
-import { AuthenticatedGuard } from 'src/modules/auth/authenticated.guard';
+import { AuthenticatedGuard } from 'src/modules/auth/guard/authenticated.guard';
 
 @Module({
   imports: [

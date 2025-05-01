@@ -11,8 +11,8 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Request } from 'express';
-import { AuthenticatedGuard } from 'src/modules/auth/authenticated.guard';
-import { LocalAuthGuard } from 'src/modules/auth/local-strategy.guard';
+import { AuthenticatedGuard } from 'src/modules/auth/guard/authenticated.guard';
+import { LocalAuthGuard } from 'src/modules/auth/guard/local-strategy.guard';
 
 @Controller('auth')
 export class AuthController {

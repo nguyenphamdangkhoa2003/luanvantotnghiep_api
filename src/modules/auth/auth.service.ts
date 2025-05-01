@@ -3,7 +3,8 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './interfaces/types';
 import { UsersService } from '../users/users.service';
-import { SignInDto, SignInResponseDto } from 'src/modules/auth/Dto/signin.dto';
+import { SignInDto } from 'src/modules/auth/dto/signin.dto';
+import { SignInDao } from 'src/modules/auth/dao/signin.dao';
 
 @Injectable()
 export class AuthService {
@@ -54,7 +55,7 @@ export class AuthService {
     const payload: JwtPayload = { sub: user._id, username: user.username };
     const access_token = await this.jwtService.signAsync(payload);
     this.logger.log(`🚀 User ${signInData.username} signed in successfully`);
-    const responseData: SignInResponseDto = {
+    const responseData: SignInDao = {
       user,
       access_token,
     };

@@ -7,8 +7,3 @@ export class SignInDto {
   @IsNotEmpty({ message: 'Mật khẩu là trường bắt buộc' })
   password: string;
 }
-
-export class SignInResponseDto {
-  access_token: string;
-  user: User;
-}
