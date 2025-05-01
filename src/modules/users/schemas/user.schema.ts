@@ -1,31 +1,52 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { Document } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import * as mongoose from 'mongoose';
 
-export type UserDocument = HydratedDocument<User>;
+export enum UserRole {
+  ADMIN = 'admin',
+  CUSTOMER = 'customer',
+  DRIVER = 'driver',
+}
 
 @Schema({ timestamps: true })
-export class User {
-  @Prop({ type: mongoose.Schema.Types.ObjectId })
-  _id: string;
-  @Prop({ required: true, unique: true })
-  username: string;
+export class User extends Document {
+  @Prop({ type: String, default: () => crypto.randomUUID() })
+  declare id: string;
 
-  @Prop({ required: true, select: false })
+  @Prop({ required: true, unique: true })
+  email: string;
+
+  @Prop({ required: true })
   password: string;
+
+  @Prop()
+  googleId: string;
+
+  @Prop({ enum: UserRole, default: UserRole.CUSTOMER })
+  role: UserRole;
+
+  @Prop({ default: false })
+  isVerified: boolean;
+
+  @Prop()
+  resetPasswordToken: string;
+
+  @Prop()
+  resetPasswordExpires: Date;
+
+  @Prop({ type: Date, default: Date.now })
+  createdAt: Date;
+
+  @Prop({ type: Date, default: Date.now })
+  updatedAt: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Middleware để hash password
+// Middleware để mã hóa mật khẩu trước khi lưu
 UserSchema.pre('save', async function (next) {
-  try {
-    if (this.isModified('password')) {
-      this.password = await bcrypt.hash(this.password, 10);
-    }
-    next();
-  } catch (error) {
-    next(error instanceof Error ? error : new Error('Hashing password failed'));
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password, 10);
   }
+  next();
 });

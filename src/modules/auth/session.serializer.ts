@@ -14,7 +14,7 @@ export class SessionSerializer extends PassportSerializer {
     user: User,
     done: (err: Error | null, payload: JwtPayload) => void,
   ): void {
-    done(null, { sub: user._id.toString(), username: user.username });
+    done(null, { sub: user.id.toString(), email: user.email });
   }
 
   async deserializeUser(
@@ -22,7 +22,7 @@ export class SessionSerializer extends PassportSerializer {
     done: (err: Error | null, user: User | null) => void,
   ): Promise<void> {
     try {
-      const user = await this.userService.findOne(payload.username);
+      const user = await this.userService.findOne({ email: payload.email });
       if (!user) {
         return done(new UnauthorizedException('User not found'), null);
       }

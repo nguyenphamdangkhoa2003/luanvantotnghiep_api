@@ -1,7 +1,8 @@
 export interface JwtPayload {
   sub: string;
-  username: string;
+  email: string;
 }
-export interface AuthRequest extends Request {
-  user?: JwtPayload;
+
+export interface UserQuery {
+  [key: string]: any;
 }
