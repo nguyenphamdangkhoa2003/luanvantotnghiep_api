@@ -2,42 +2,30 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from './interfaces/types';
-import { UsersService } from '../users/users.service';
-import { SignInDao } from 'src/modules/auth/dao/signin.dao';
-import { LoginUserDto } from 'src/modules/auth/dto/login-user.dto';
-import { CreateUserDto } from 'src/modules/users/dto/create-user.dto';
+import { UsersService } from '@/modules/users/users.service';
+import { LoginUserDto } from '@/modules/auth/dto/login-user.dto';
+import { CreateUserDto } from '@/modules/users/dto/create-user.dto';
+import { JwtPayload, UserToken } from './interfaces/types';
+import { ApiResponse } from '@/types';
+import { User } from '@/modules/users/schemas/user.schema';
+import { RefreshTokenService } from '@/modules/refresh-token/refresh-token.service';
+import { Types } from 'mongoose';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name, { timestamp: true });
   constructor(
     private readonly usersService: UsersService,
-    private jwtService: JwtService,
+    private readonly jwtService: JwtService,
+    private readonly refreshTokenService: RefreshTokenService,
   ) {}
-  async validateUser({ email, password }: LoginUserDto) {
-    const user = await this.usersService.findOne({ email }, true);
-    if (!user) {
-      this.logger.error(`🚨 Login failed: User ${email} not found`);
-      throw new UnauthorizedException(
-        'Tài khoản hoặc mật khẩu không chính xác',
-      );
-    }
 
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      this.logger.error(`🚨 Login failed: Incorrect password for username}`);
-      throw new UnauthorizedException(
-        'Tài khoản hoặc mật khẩu không chính xác',
-      );
-    }
-    return user;
-  }
-  async signIn(signInData: LoginUserDto): Promise<{ access_token: string }> {
+  async signIn(signInData: LoginUserDto): Promise<ApiResponse<UserToken>> {
     const user = await this.usersService.findOne(
       { email: signInData.email },
       true,
@@ -58,28 +46,88 @@ export class AuthService {
         'Tài khoản hoặc mật khẩu không chính xác',
       );
     }
-
-    const payload: JwtPayload = { sub: user.id, email: user.email };
-    const access_token = await this.jwtService.signAsync(payload);
+    const token = await this.generateUserToken({
+      userId: user._id,
+      email: user.email,
+    });
     this.logger.log(`🚀 User ${signInData.email} signed in successfully`);
-    const responseData: SignInDao = {
-      user,
-      access_token,
+
+    return {
+      message: 'success',
+      code: 200,
+      data: token,
     };
-    return responseData;
   }
 
-  async signup(data: CreateUserDto) {
+  async signup(
+    data: CreateUserDto,
+  ): Promise<ApiResponse<Omit<User, 'password'>>> {
     const { email } = data;
 
     const emailInUse = await this.usersService.findOne({ email });
 
     if (emailInUse) {
-      throw new BadRequestException('Email  đã được sử dụng');
+      throw new BadRequestException('Email đã được sử dụng');
     }
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const user = await this.usersService.create(data);
+    return {
+      message: 'success',
+      code: 201,
+      data: user,
+    };
+  }
 
-    await this.usersService.create({ ...data, password: hashedPassword });
+  async validateUser({ email, password }: LoginUserDto) {
+    const user = await this.usersService.findOne({ email }, true);
+    if (!user) {
+      this.logger.error(`🚨 Login failed: User ${email} not found`);
+      throw new UnauthorizedException(
+        'Tài khoản hoặc mật khẩu không chính xác',
+      );
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      console.log(match);
+      this.logger.error(`🚨 Login failed: Incorrect password for ${email}`);
+      throw new UnauthorizedException(
+        'Tài khoản hoặc mật khẩu không chính xác',
+      );
+    }
+    return user;
+  }
+  async refreshTokens(refreshToken: string) {
+    const token = await this.refreshTokenService.findOneAndDelete(refreshToken);
+
+    if (!token) {
+      throw new UnauthorizedException('Token không hợp lệ');
+    }
+
+    const user = await this.usersService.findOne({ _id: token.userId });
+
+    if (!user)
+      throw new NotFoundException(
+        `Không tìm thấy người dùng với #id: ${token.userId}`,
+      );
+
+    return this.generateUserToken({ userId: token.userId, email: user.email });
+  }
+  async generateUserToken({
+    userId,
+    email,
+  }: {
+    userId: Types.ObjectId;
+    email: string;
+  }): Promise<UserToken> {
+    const payload: JwtPayload = { sub: userId, email };
+    const access_token = await this.jwtService.signAsync(payload);
+    const refresh_token = crypto.randomUUID();
+
+    await this.refreshTokenService.create({ userId, token: refresh_token });
+    return {
+      access_token,
+      refresh_token,
+    };
   }
 }

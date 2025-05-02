@@ -3,10 +3,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import configuration, {
   configModuleOptions,
-} from 'src/config/app/configuration';
+} from '@/config/app/configuration';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
-import { AuthModule } from 'src/modules/auth/auth.module';
+import { AuthModule } from '@/modules/auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 
 const dbLogger = new Logger('Database');

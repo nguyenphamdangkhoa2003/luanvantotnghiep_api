@@ -1,10 +1,11 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './core/app.module';
 import { ConsoleLogger, Logger, ValidationPipe } from '@nestjs/common';
 import * as session from 'express-session';
 import { ConfigService } from '@nestjs/config';
 import { CipherKey } from 'crypto';
 import * as passport from 'passport';
+import { AuthenticatedGuard } from '@/modules/auth/guard/authenticated.guard';
 
 const APP_NAME = 'XeShare API';
 const logger = new Logger(APP_NAME, { timestamp: true });
@@ -37,6 +38,7 @@ async function bootstrap() {
         forbidNonWhitelisted: true,
       }),
     );
+    app.useGlobalGuards(new AuthenticatedGuard(app.get(Reflector)));
     const port = process.env.PORT ?? 3000;
     await app.listen(port);
     logger.log(`🚀 Server running on port ${port}`);

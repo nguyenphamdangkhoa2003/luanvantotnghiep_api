@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { UserQuery } from 'src/modules/auth/interfaces/types';
-import { CreateUserDto } from 'src/modules/users/dto/create-user.dto';
-import { User } from 'src/modules/users/schemas/user.schema';
+import { Model, Types } from 'mongoose';
+import { UserQuery } from '@/modules/auth/interfaces/types';
+import { CreateUserDto } from '@/modules/users/dto/create-user.dto';
+import { User } from '@/modules/users/schemas/user.schema';
 
 // This should be a real class/interface representing a user entity
 
@@ -23,7 +23,7 @@ export class UsersService {
   }
 
   async create(data: CreateUserDto) {
-    const user = new this.userModel(data);
+    const user = new this.userModel({ _id: new Types.ObjectId(), ...data });
     return user.save();
   }
 }

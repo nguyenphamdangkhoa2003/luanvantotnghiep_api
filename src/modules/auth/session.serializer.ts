@@ -1,8 +1,8 @@
 import { PassportSerializer } from '@nestjs/passport';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { UsersService } from 'src/modules/users/users.service';
-import { User } from 'src/modules/users/schemas/user.schema';
-import { JwtPayload } from 'src/modules/auth/interfaces/types';
+import { UsersService } from '@/modules/users/users.service';
+import { User } from '@/modules/users/schemas/user.schema';
+import { JwtPayload } from '@/modules/auth/interfaces/types';
 
 @Injectable()
 export class SessionSerializer extends PassportSerializer {
@@ -14,7 +14,7 @@ export class SessionSerializer extends PassportSerializer {
     user: User,
     done: (err: Error | null, payload: JwtPayload) => void,
   ): void {
-    done(null, { sub: user.id.toString(), email: user.email });
+    done(null, { sub: user._id, email: user.email });
   }
 
   async deserializeUser(

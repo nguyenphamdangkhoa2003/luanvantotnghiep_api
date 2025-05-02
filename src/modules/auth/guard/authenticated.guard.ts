@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { IS_PUBLIC_KEY } from 'src/modules/auth/decorators/public.decorators';
+import { IS_PUBLIC_KEY } from '@/modules/auth/decorators/public.decorators';
 
 @Injectable()
 export class AuthenticatedGuard implements CanActivate {

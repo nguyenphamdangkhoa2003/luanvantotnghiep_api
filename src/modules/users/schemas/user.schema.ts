@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, HydratedDocument, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
 export enum UserRole {
@@ -8,10 +8,12 @@ export enum UserRole {
   DRIVER = 'driver',
 }
 
+export type UserDocument = HydratedDocument<User>;
+
 @Schema({ timestamps: true })
-export class User extends Document {
-  @Prop({ type: String, default: () => crypto.randomUUID() })
-  declare id: string;
+export class User {
+  @Prop({ type: Types.ObjectId, auto: true })
+  declare _id: Types.ObjectId;
 
   @Prop({ required: true, unique: true })
   email: string;

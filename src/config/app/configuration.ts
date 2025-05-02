@@ -1,6 +1,6 @@
 import { ConfigModuleOptions } from '@nestjs/config';
 import { IsInt, IsNotEmpty, IsString, Min } from 'class-validator';
-import { AppConfig } from 'src/config/app/interface/types';
+import { AppConfig } from '@/config/app/interface/types';
 import { validateSync } from 'class-validator';
 import { plainToClass } from 'class-transformer';
 

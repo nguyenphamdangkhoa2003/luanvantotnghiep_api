@@ -1,18 +1,28 @@
 import { Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { UsersModule } from 'src/modules/users/users.module';
+import { UsersModule } from '@/modules/users/users.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { LocalStrategy } from 'src/modules/auth/strategies/local.strategy';
+import { LocalStrategy } from '@/modules/auth/strategies/local.strategy';
 import { PassportModule } from '@nestjs/passport';
-import { SessionSerializer } from 'src/modules/auth/session.serializer';
-import { AuthenticatedGuard } from 'src/modules/auth/guard/authenticated.guard';
+import { SessionSerializer } from '@/modules/auth/session.serializer';
+import { AuthenticatedGuard } from '@/modules/auth/guard/authenticated.guard';
+import { RefreshTokenService } from '@/modules/refresh-token/refresh-token.service';
+import { RefreshTokenModule } from '@/modules/refresh-token/refresh-token.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import {
+  RefreshToken,
+  RefreshTokenSchema,
+} from '@/modules/refresh-token/schema/refresh-token.schema';
 
 @Module({
   imports: [
     PassportModule.register({ session: true }),
     UsersModule,
+    MongooseModule.forFeature([
+      { name: RefreshToken.name, schema: RefreshTokenSchema },
+    ]),
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({
         global: true,
@@ -28,6 +38,7 @@ import { AuthenticatedGuard } from 'src/modules/auth/guard/authenticated.guard';
     LocalStrategy,
     SessionSerializer,
     AuthenticatedGuard,
+    RefreshTokenService,
   ],
 })
 export class AuthModule {}
