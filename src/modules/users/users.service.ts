@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { UserQuery } from '@/modules/auth/interfaces/types';
+import { IUserQuery } from '@/modules/auth/interfaces/types';
 import { CreateUserDto } from '@/modules/users/dto/create-user.dto';
 import { User } from '@/modules/users/schemas/user.schema';
 
@@ -14,7 +14,7 @@ export class UsersService {
   ) {}
 
   async findOne(
-    query: UserQuery,
+    query: IUserQuery,
     isWithPassword = false,
   ): Promise<User | undefined | null> {
     if (isWithPassword)

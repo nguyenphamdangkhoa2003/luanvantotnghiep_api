@@ -10,11 +10,12 @@ import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '@/modules/users/users.service';
 import { LoginUserDto } from '@/modules/auth/dto/login-user.dto';
 import { CreateUserDto } from '@/modules/users/dto/create-user.dto';
-import { JwtPayload, UserToken } from './interfaces/types';
+import { IJwtPayload, IUserToken } from './interfaces/types';
 import { ApiResponse } from '@/types';
 import { User } from '@/modules/users/schemas/user.schema';
 import { RefreshTokenService } from '@/modules/refresh-token/refresh-token.service';
 import { Types } from 'mongoose';
+import { MailService } from '@/modules/mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -23,9 +24,10 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly refreshTokenService: RefreshTokenService,
+    private readonly mailService: MailService,
   ) {}
 
-  async signIn(signInData: LoginUserDto): Promise<ApiResponse<UserToken>> {
+  async signIn(signInData: LoginUserDto): Promise<ApiResponse<IUserToken>> {
     const user = await this.usersService.findOne(
       { email: signInData.email },
       true,
@@ -71,6 +73,9 @@ export class AuthService {
     }
 
     const user = await this.usersService.create(data);
+    const token = Math.floor(1000 + Math.random() * 9000).toString();
+``
+    await this.mailService.sendUserConfirmation(user, token);
     return {
       message: 'success',
       code: 201,
@@ -119,8 +124,8 @@ export class AuthService {
   }: {
     userId: Types.ObjectId;
     email: string;
-  }): Promise<UserToken> {
-    const payload: JwtPayload = { sub: userId, email };
+  }): Promise<IUserToken> {
+    const payload: IJwtPayload = { sub: userId, email };
     const access_token = await this.jwtService.signAsync(payload);
     const refresh_token = crypto.randomUUID();
 

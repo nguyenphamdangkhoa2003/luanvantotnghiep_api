@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, HydratedDocument, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -18,6 +19,9 @@ export class User {
   @Prop({ required: true, unique: true })
   email: string;
 
+  @Prop({ required: true })
+  name: string;
+  
   @Prop({ required: true })
   password: string;
 
@@ -41,6 +45,12 @@ export class User {
 
   @Prop({ type: Date, default: Date.now })
   updatedAt: Date;
+
+  @Prop({
+    enum: OAuthProvidersEnum,
+    default: OAuthProvidersEnum.LOCAL,
+  })
+  provider: OAuthProvidersEnum;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

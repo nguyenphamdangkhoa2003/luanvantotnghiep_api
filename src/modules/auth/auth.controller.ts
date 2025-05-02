@@ -16,7 +16,7 @@ import { AuthenticatedGuard } from '@/modules/auth/guard/authenticated.guard';
 import { LocalAuthGuard } from '@/modules/auth/guard/local-strategy.guard';
 import { CreateUserDto } from '@/modules/users/dto/create-user.dto';
 import { ApiResponse, AuthRequest } from '@/types';
-import { UserToken } from '@/modules/auth/interfaces/types';
+import { IUserToken } from '@/modules/auth/interfaces/types';
 import { RefreshTokenDto } from '@/modules/auth/dto/refresh-token.dto';
 import { Public } from '@/modules/auth/decorators/public.decorators';
 
@@ -30,7 +30,7 @@ export class AuthController {
   @Public()
   @UseGuards(LocalAuthGuard)
   @Post('signin')
-  async signIn(@Req() req: AuthRequest): Promise<ApiResponse<UserToken>> {
+  async signIn(@Req() req: AuthRequest): Promise<ApiResponse<IUserToken>> {
     if (!req.user || !req.user.email || !req.user._id) {
       throw new UnauthorizedException('User not authenticated');
     }

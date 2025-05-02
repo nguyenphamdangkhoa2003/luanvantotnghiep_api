@@ -1,13 +1,12 @@
 import { Logger, Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import configuration, {
-  configModuleOptions,
-} from '@/config/app/configuration';
+import configuration, { configModuleOptions } from '@/config/app/configuration';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
+import { MailModule } from '@/modules/mail/mail.module';
 
 const dbLogger = new Logger('Database');
 
@@ -20,6 +19,7 @@ const logDatabaseConnection = () => {
 
 @Module({
   imports: [
+    MailModule,
     ConfigModule.forRoot({
       ...configModuleOptions,
       load: [configuration],
