@@ -1,7 +1,18 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
+import {
+  IsBoolean,
+  IsDate,
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+} from 'class-validator';
+import { NAME_REGEX, SLUG_REGEX } from '@/common/constants/regex.constant';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -11,46 +22,74 @@ export enum UserRole {
 
 export type UserDocument = HydratedDocument<User>;
 
-@Schema({ timestamps: true })
+@Schema()
 export class User {
   @Prop({ type: Types.ObjectId, auto: true })
-  declare _id: Types.ObjectId;
+  declare public _id: Types.ObjectId;
 
-  @Prop({ required: true, unique: true })
-  email: string;
+  @Prop({ required: true, type: String })
+  @IsString()
+  @Length(3, 106)
+  @Matches(SLUG_REGEX, {
+    message: 'Username must be a valid slugs',
+  })
+  public username: string;
 
-  @Prop({ required: true })
-  name: string;
-  
-  @Prop({ required: true })
-  password: string;
+  @Prop({ required: true, unique: true, type: String })
+  @IsEmail({}, { message: 'Invalid email' })
+  public email: string;
 
-  @Prop()
-  googleId: string;
+  @Prop({ required: true, type: String })
+  @IsString()
+  @Length(3, 100)
+  @Matches(NAME_REGEX, {
+    message: 'Name must not have special characters',
+  })
+  public name: string;
 
-  @Prop({ enum: UserRole, default: UserRole.CUSTOMER })
-  role: UserRole;
+  @Prop({ required: true, type: String })
+  @IsString()
+  @Length(8, 100, { message: 'Password must be between 8 and 100 characters' })
+  public password: string;
 
-  @Prop({ default: false })
-  isVerified: boolean;
+  @Prop({ type: String })
+  @IsOptional()
+  @IsString()
+  public googleId: string;
 
-  @Prop()
-  resetPasswordToken: string;
+  @Prop({ enum: UserRole, default: UserRole.CUSTOMER, type: String })
+  @IsEnum(UserRole, { message: 'Invalid role' })
+  public role: UserRole;
 
-  @Prop()
-  resetPasswordExpires: Date;
+  @Prop({ default: false, type: Boolean })
+  @IsBoolean()
+  public isVerified: boolean;
+
+  @Prop({ type: String })
+  @IsOptional()
+  @IsString()
+  public resetPasswordToken: string;
+
+  @Prop({ type: Date })
+  @IsOptional()
+  @IsDate()
+  public resetPasswordExpires: Date;
 
   @Prop({ type: Date, default: Date.now })
-  createdAt: Date;
+  @IsDate()
+  public createdAt: Date;
 
   @Prop({ type: Date, default: Date.now })
-  updatedAt: Date;
+  @IsDate()
+  public updatedAt: Date;
 
   @Prop({
     enum: OAuthProvidersEnum,
     default: OAuthProvidersEnum.LOCAL,
+    type: String,
   })
-  provider: OAuthProvidersEnum;
+  @IsEnum(OAuthProvidersEnum, { message: 'Invalid OAuth provider' })
+  public provider: OAuthProvidersEnum;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

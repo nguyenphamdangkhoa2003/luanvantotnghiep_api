@@ -7,6 +7,7 @@ import { Connection } from 'mongoose';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { MailModule } from '@/modules/mail/mail.module';
+import { CommonModule } from '@/modules/common/common.module';
 
 const dbLogger = new Logger('Database');
 
@@ -20,6 +21,7 @@ const logDatabaseConnection = () => {
 @Module({
   imports: [
     MailModule,
+    CommonModule,
     ConfigModule.forRoot({
       ...configModuleOptions,
       load: [configuration],

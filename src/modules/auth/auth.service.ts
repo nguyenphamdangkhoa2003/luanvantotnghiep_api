@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -12,10 +13,12 @@ import { LoginUserDto } from '@/modules/auth/dto/login-user.dto';
 import { CreateUserDto } from '@/modules/users/dto/create-user.dto';
 import { IJwtPayload, IUserToken } from './interfaces/types';
 import { ApiResponse } from '@/types';
-import { User } from '@/modules/users/schemas/user.schema';
+import { User, UserDocument } from '@/modules/users/schemas/user.schema';
 import { RefreshTokenService } from '@/modules/refresh-token/refresh-token.service';
 import { Types } from 'mongoose';
 import { MailService } from '@/modules/mail/mail.service';
+import { CommonService } from '@/modules/common/common.service';
+import { RegisterUserDto } from '@/modules/auth/dto/register-user.dto';
 
 @Injectable()
 export class AuthService {
@@ -25,6 +28,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly mailService: MailService,
+    private readonly commonService: CommonService,
   ) {}
 
   async signIn(signInData: LoginUserDto): Promise<ApiResponse<IUserToken>> {
@@ -61,20 +65,12 @@ export class AuthService {
     };
   }
 
-  async signup(
+  public async signup(
     data: CreateUserDto,
   ): Promise<ApiResponse<Omit<User, 'password'>>> {
-    const { email } = data;
-
-    const emailInUse = await this.usersService.findOne({ email });
-
-    if (emailInUse) {
-      throw new BadRequestException('Email đã được sử dụng');
-    }
-
-    const user = await this.usersService.create(data);
+    const { email, name, password } = data;
+    const user = await this.usersService.create(email, name, password);
     const token = Math.floor(1000 + Math.random() * 9000).toString();
-``
     await this.mailService.sendUserConfirmation(user, token);
     return {
       message: 'success',
@@ -83,7 +79,7 @@ export class AuthService {
     };
   }
 
-  async validateUser({ email, password }: LoginUserDto) {
+  public async validateUser({ email, password }: LoginUserDto) {
     const user = await this.usersService.findOne({ email }, true);
     if (!user) {
       this.logger.error(`🚨 Login failed: User ${email} not found`);
@@ -102,7 +98,7 @@ export class AuthService {
     }
     return user;
   }
-  async refreshTokens(refreshToken: string) {
+  public async refreshTokens(refreshToken: string) {
     const token = await this.refreshTokenService.findOneAndDelete(refreshToken);
 
     if (!token) {
@@ -118,7 +114,7 @@ export class AuthService {
 
     return this.generateUserToken({ userId: token.userId, email: user.email });
   }
-  async generateUserToken({
+  public async generateUserToken({
     userId,
     email,
   }: {

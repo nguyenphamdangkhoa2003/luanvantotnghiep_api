@@ -1,7 +1,7 @@
-import { NAME_REGEX, SLUG_REGEX } from '@/common/constants/regex.constant';
-import { IsEmail, IsString, Length, Matches } from 'class-validator';
+import { NAME_REGEX } from "@/common/constants/regex.constant";
+import { IsEmail, IsString, Length, Matches } from "class-validator";
 
-export class CreateUserDto {
+export class RegisterUserDto {
   @IsEmail({}, { message: 'Email không hợp lệ' })
   public email: string;
 
