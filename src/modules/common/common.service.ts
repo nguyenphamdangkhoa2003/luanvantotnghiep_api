@@ -1,4 +1,12 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { IMessage } from '@/types';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { validate } from 'class-validator';
 import { Model, HydratedDocument } from 'mongoose';
 import slugify from 'slugify';
@@ -87,7 +95,7 @@ export class CommonService {
     if (errors.length > 0) {
       throw new BadRequestException({
         message: 'Validation failed',
-        errors: errors.map(error => ({
+        errors: errors.map((error) => ({
           property: error.property,
           constraints: error.constraints,
         })),
@@ -124,5 +132,9 @@ export class CommonService {
       this.logger.error(error);
       throw new InternalServerErrorException('Operation failed');
     }
+  }
+
+  public generateMessage(message: string): IMessage {
+    return { id: crypto.randomUUID(), message };
   }
 }

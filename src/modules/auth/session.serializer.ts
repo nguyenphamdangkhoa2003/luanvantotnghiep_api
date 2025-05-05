@@ -22,7 +22,7 @@ export class SessionSerializer extends PassportSerializer {
     done: (err: Error | null, user: User | null) => void,
   ): Promise<void> {
     try {
-      const user = await this.userService.findOne({ email: payload.email });
+      const user = await this.userService.findOneByEmail(payload.email);
       if (!user) {
         return done(new UnauthorizedException('User not found'), null);
       }

@@ -1,238 +1,284 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
+  Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { IUserQuery } from '@/modules/auth/interfaces/types';
-import { CreateUserDto } from '@/modules/users/dto/create-user.dto';
-import { User, UserDocument } from '@/modules/users/schemas/user.schema';
-import { CommonService } from '@/modules/common/common.service';
-import { UpdateUserDto } from '@/modules/users/dto/update-user.dto';
-import { ChangeEmailDto } from '@/modules/users/dto/change-email.dto';
+import { User, UserDocument } from './schemas/user.schema';
 import * as bcrypt from 'bcrypt';
+import { CommonService } from '@/modules/common/common.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdatePasswordDto } from './dto/update-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name, { timestamp: true });
+
   constructor(
-    @InjectModel(User.name) private userModel: Model<UserDocument>,
-    private commonService: CommonService,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
+    private readonly commonService: CommonService,
   ) {}
 
-  /**
-   * Find one user by query
-   * @param query The query to find the user
-   * @param isWithPassword Whether to include the password field
-   */
-  public async findOne(
-    query: IUserQuery,
-    isWithPassword = false,
-  ): Promise<UserDocument | null> {
-    const user = isWithPassword
-      ? await this.userModel.findOne(query).select('+password').exec()
-      : await this.userModel.findOne(query).exec();
+  // Tạo người dùng mới
+  // Highlights: Tạo người dùng với email, tên và mật khẩu từ DTO
+  async create(dto: CreateUserDto): Promise<UserDocument> {
+    const { email, name, password } = dto;
+
+    // Alerts: Kiểm tra email đã tồn tại
+    const existingUser = await this.findOneByEmail(email);
+    if (existingUser) {
+      throw new BadRequestException(
+        this.commonService.generateMessage('Email đã được sử dụng'),
+      );
+    }
+
+    this.logger.log(`Tạo người dùng mới với email: ${email}`);
+
+    // Queries: Tạo người dùng mới
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new this.userModel({
+      email: email.toLowerCase(),
+      name: this.commonService.formatName(name),
+      credentials: {
+        version: 0,
+        password: hashedPassword,
+        lastPassword: '',
+        passwordUpdatedAt: dayjs().unix(),
+        updatedAt: dayjs().unix(),
+      },
+      isEmailVerified: false,
+    });
+
+    // Queries: Lưu người dùng
+    await this.commonService.saveEntity(this.userModel, user, true);
+    this.logger.debug(`Lưu người dùng: ${user.email}`);
     return user;
   }
 
-  /**
-   * Find one user by ID
-   * @param id The user ID (string or ObjectId)
-   */
-  public async findOneById(id: string): Promise<UserDocument> {
-    const user = await this.userModel
-      .findOne({ _id: new Types.ObjectId(id) })
-      .exec();
-    this.commonService.checkEntityExistence(user, 'User');
-    return user!;
-  }
+  // Tìm người dùng theo email
+  // Highlights: Tìm người dùng với email, trả về null nếu không tồn tại
+  async findOneByEmail(email: string): Promise<UserDocument | null> {
+    // Alerts: Kiểm tra email không rỗng
+    if (!email) {
+      throw new BadRequestException(
+        this.commonService.generateMessage('Email không được cung cấp'),
+      );
+    }
 
-  /**
-   * Count users matching a query
-   * @param query The query to count users
-   */
-  public async count(query: IUserQuery): Promise<number> {
-    return await this.userModel.countDocuments(query).exec();
-  }
-
-  /**
-   * Find one user by email
-   * @param email The user's email
-   */
-  public async findOneByEmail(email: string): Promise<UserDocument> {
+    // Queries: Tìm người dùng theo email
     const user = await this.userModel
       .findOne({ email: email.toLowerCase() })
       .exec();
-    this.throwUnauthorizedException(user);
-    return user!;
+    this.logger.debug(`Tìm người dùng với email: ${email}`);
+    return user;
   }
 
-  /**
-   * Throw UnauthorizedException if user is not found
-   * @param user The user entity
-   */
-  private throwUnauthorizedException(user: UserDocument | null): void {
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-  }
-
-  /**
-   * Find one user by username
-   * @param username The user's username
-   * @param forAuth Whether this is for authentication purposes
-   */
-  public async findOneByUsername(
+  // Tìm người dùng theo username
+  // Highlights: Tìm người dùng với username, tùy chọn ẩn mật khẩu
+  async findOneByUsername(
     username: string,
-    forAuth = false,
-  ): Promise<UserDocument> {
+    sensitive = false,
+  ): Promise<UserDocument | null> {
+    // Alerts: Kiểm tra username không rỗng
+    if (!username) {
+      throw new BadRequestException(
+        this.commonService.generateMessage(
+          'Tên người dùng không được cung cấp',
+        ),
+      );
+    }
+
+    // Queries: Tìm người dùng theo username
+    const query = this.userModel.findOne({ username: username.toLowerCase() });
+    if (!sensitive) {
+      query.select('-credentials.password -credentials.lastPassword');
+    }
+    const user = await query.exec();
+    this.logger.debug(`Tìm người dùng với username: ${username}`);
+    return user;
+  }
+
+  // Tìm người dùng theo ID và phiên bản credentials
+  // Highlights: Xác minh người dùng với ID và version để đảm bảo token hợp lệ
+  async findOneByCredentials(
+    id: string,
+    version: number,
+  ): Promise<UserDocument | null> {
+    // Alerts: Kiểm tra ID hợp lệ
+    if (!Types.ObjectId.isValid(id)) {
+      this.logger.error(`ID người dùng không hợp lệ: ${id}`);
+      throw new BadRequestException(
+        this.commonService.generateMessage('ID người dùng không hợp lệ'),
+      );
+    }
+
+    // Alerts: Kiểm tra version hợp lệ
+    if (!Number.isInteger(version) || version < 0) {
+      this.logger.error(`Version không hợp lệ: ${version}`);
+      throw new BadRequestException(
+        this.commonService.generateMessage('Version không hợp lệ'),
+      );
+    }
+
+    this.logger.debug(`Tìm người dùng với ID: ${id} và version: ${version}`);
+
+    // Queries: Tìm người dùng với _id và version
     const user = await this.userModel
-      .findOne({ username: username.toLowerCase() })
+      .findOne({ _id: new Types.ObjectId(id), 'credentials.version': version })
       .exec();
 
-    if (forAuth) {
-      this.throwUnauthorizedException(user);
+    if (!user) {
+      this.logger.warn(
+        `Không tìm thấy người dùng với ID: ${id}, version: ${version}`,
+      );
     } else {
-      this.commonService.checkEntityExistence(user, 'User');
+      this.logger.debug(`Tìm thấy người dùng: ${user.email}`);
     }
 
-    return user!;
-  }
-
-  /**
-   * Update a user
-   * @param userId The user ID (string or ObjectId)
-   * @param dto The update data
-   */
-  public async update(
-    userId: string,
-    dto: UpdateUserDto,
-  ): Promise<UserDocument> {
-    const user = await this.findOneById(userId);
-    const { name, username } = dto;
-
-    if (name != null && name !== user.name) {
-      user.name = this.commonService.formatName(name);
-    }
-
-    if (username != null) {
-      const formattedUsername = username.toLowerCase();
-      if (user.username === formattedUsername) {
-        throw new BadRequestException('Username should be different');
-      }
-      await this.checkUsernameUniqueness(formattedUsername);
-      user.username = formattedUsername;
-    }
-
-    await this.commonService.saveEntity(this.userModel, user);
     return user;
   }
 
-  /**
-   * Check if a username is unique
-   * @param username The username to check
-   */
-  private async checkUsernameUniqueness(username: string): Promise<void> {
-    const users = await this.userModel.find({ username }).exec();
-    if (users.length > 0) {
-      throw new ConflictException('Username already in use');
-    }
-  }
-
-  public async updateEmail(
-    userId: string,
-    dto: ChangeEmailDto,
-  ): Promise<UserDocument> {
-    const user = await this.findOneById(userId);
-    const { email, password } = dto;
-
-    if (!(await bcrypt.compare(password, user.password))) {
-      throw new BadRequestException('Invalid password');
+  // Tìm người dùng theo email mà không kiểm tra trạng thái
+  // Highlights: Dùng để kiểm tra email mà không cần xác minh
+  async uncheckedUserByEmail(email: string): Promise<UserDocument | null> {
+    // Alerts: Kiểm tra email không rỗng
+    if (!email) {
+      throw new BadRequestException(
+        this.commonService.generateMessage('Email không được cung cấp'),
+      );
     }
 
-    const formattedEmail = email.toLowerCase();
-    await this.checkEmailUniqueness(formattedEmail);
-    user.email = formattedEmail;
-    await this.commonService.saveEntity(this.userModel, user);
+    // Queries: Tìm người dùng theo email
+    const user = await this.userModel
+      .findOne({ email: email.toLowerCase() })
+      .lean()
+      .exec();
+    this.logger.debug(`Tìm người dùng không kiểm tra với email: ${email}`);
     return user;
   }
 
-  public async checkEmailUniqueness(email: string): Promise<void> {
-    const users = await this.userModel.find({ email });
-
-    if (users.length > 0) {
-      throw new ConflictException('Email already in use');
-    }
-  }
-
-  public async updatePassword(
+  // Cập nhật mật khẩu của người dùng
+  // Highlights: Kiểm tra mật khẩu cũ, đảm bảo mật khẩu mới khác và cập nhật credentials
+  async updatePassword(
+    dto: UpdatePasswordDto,
     userId: string,
-    password: string,
-    newPassword: string,
   ): Promise<UserDocument> {
-    const user = await this.findOneById(userId);
-
-    if (!(await bcrypt.compare(password, user.password))) {
-      throw new BadRequestException('Wrong password');
+    // Alerts: Kiểm tra ID hợp lệ
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException(
+        this.commonService.generateMessage('ID người dùng không hợp lệ'),
+      );
     }
+
+    const { oldPassword, newPassword } = dto;
+
+    this.logger.log(`Bắt đầu cập nhật mật khẩu cho người dùng: ${userId}`);
+
+    // Queries: Tìm người dùng với trường password
+    const user = await this.userModel
+      .findById(new Types.ObjectId(userId))
+      .select('+password')
+      .exec();
+    if (!user) {
+      throw new NotFoundException(
+        this.commonService.generateMessage('Người dùng không tồn tại'),
+      );
+    }
+
+    // Alerts: Kiểm tra mật khẩu cũ
+    if (!(await bcrypt.compare(oldPassword, user.password))) {
+      throw new UnauthorizedException(
+        this.commonService.generateMessage('Mật khẩu cũ không đúng'),
+      );
+    }
+
+    // Alerts: Đảm bảo mật khẩu mới khác với hiện tại
     if (await bcrypt.compare(newPassword, user.password)) {
-      throw new BadRequestException('New password must be different');
+      throw new BadRequestException(
+        this.commonService.generateMessage(
+          'Mật khẩu mới phải khác với hiện tại',
+        ),
+      );
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    // Queries: Cập nhật mật khẩu và credentials
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    user.credentials.updatePassword(user.password); // Lưu mật khẩu cũ vào lastPassword
+    user.password = hashedNewPassword;
+
+    // Queries: Lưu thay đổi
     await this.commonService.saveEntity(this.userModel, user);
+    this.logger.log(`Cập nhật mật khẩu thành công cho người dùng ${userId}`);
+
     return user;
   }
 
-  public async resetPassword(
-    userId: string,
-    password: string,
-  ): Promise<UserDocument> {
-    const user = await this.findOneById(userId);
-    user.password = await bcrypt.hash(password, 10);
-    await this.commonService.saveEntity(this.userModel, user);
-    return user;
-  }
+  // Đặt lại mật khẩu của người dùng
+  // Highlights: Sử dụng token để xác minh và cập nhật mật khẩu
+  async resetPassword(dto: ResetPasswordDto): Promise<UserDocument> {
+    const { userId, password, version } = dto;
 
-  public async create(
-    email: string,
-    name: string,
-    password: string,
-  ): Promise<UserDocument> {
-    const formattedEmail = email.toLowerCase();
-    await this.checkEmailUniqueness(formattedEmail);
-    const formattedName = this.commonService.formatName(name);
-    const user = await this.userModel.create({
-      _id: new Types.ObjectId(),
-      email: formattedEmail,
-      name: formattedName,
-      username: await this.generateUsername(formattedName),
-      password: await bcrypt.hash(password, 10),
-    });
-    await this.commonService.saveEntity(this.userModel, user, true);
-    return user;
-  }
-
-  private async generateUsername(name: string): Promise<string> {
-    const pointSlug = this.commonService.generatePointSlug(name);
-    const users = await this.userModel.find({
-      username: {
-        $regex: `^${pointSlug}`, // Matches usernames starting with pointSlug
-        $options: 'i', // Case-insensitive matching (optional)
-      },
-    });
-
-    if (users.length > 0) {
-      return `${pointSlug}${users.length}`;
+    // Alerts: Kiểm tra ID hợp lệ
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException(
+        this.commonService.generateMessage('ID người dùng không hợp lệ'),
+      );
     }
 
-    return pointSlug;
+    // Queries: Tìm người dùng với ID và version
+    const user = await this.findOneByCredentials(userId, version);
+    if (!user) {
+      throw new NotFoundException(
+        this.commonService.generateMessage('Người dùng không tồn tại'),
+      );
+    }
+
+    this.logger.log(`Bắt đầu đặt lại mật khẩu cho người dùng: ${userId}`);
+
+    // Queries: Cập nhật mật khẩu và credentials
+    user.credentials.updatePassword(user.password);
+    user.password = password;
+
+    // Queries: Lưu thay đổi
+    await this.commonService.saveEntity(this.userModel, user);
+    this.logger.log(`Đặt lại mật khẩu thành công cho người dùng ${userId}`);
+
+    return user;
   }
 
-  public async remove(userId: string): Promise<UserDocument> {
-    const user = await this.findOneById(userId);
-    await this.commonService.removeEntity(this.userModel, user);
-    return user;
+  // Cập nhật trạng thái xác nhận email của người dùng
+  // Highlights: Cập nhật trường isEmailVerified trong document User
+  async updateEmailVerified(id: string, isVerified: boolean): Promise<void> {
+    // Alerts: Kiểm tra ID hợp lệ
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        this.commonService.generateMessage('ID người dùng không hợp lệ'),
+      );
+    }
+
+    // Queries: Tìm và cập nhật người dùng
+    const result = await this.userModel
+      .updateOne(
+        { _id: new Types.ObjectId(id) },
+        { isEmailVerified: isVerified },
+      )
+      .exec();
+
+    // Alerts: Kiểm tra xem có bản ghi nào được cập nhật hay không
+    if (result.matchedCount === 0) {
+      throw new NotFoundException(
+        this.commonService.generateMessage('Người dùng không tồn tại'),
+      );
+    }
+
+    this.logger.log(
+      `Cập nhật trạng thái xác nhận email cho người dùng ${id}: ${isVerified}`,
+    );
   }
 }

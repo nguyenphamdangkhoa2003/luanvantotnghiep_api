@@ -1,18 +1,24 @@
 import { NAME_REGEX, SLUG_REGEX } from '@/common/constants/regex.constant';
-import { IsEmail, IsString, Length, Matches } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  Length,
+  Matches,
+  MinLength,
+} from 'class-validator';
 
 export class CreateUserDto {
   @IsEmail({}, { message: 'Email không hợp lệ' })
-  public email: string;
+  @IsNotEmpty({ message: 'Email không được để trống' })
+  email: string;
 
-  @IsString()
-  @Length(8, 100, { message: 'Mật khẩu phải từ 8 đến 100 ký tự' })
-  public password: string;
+  @IsString({ message: 'Tên phải là chuỗi' })
+  @IsNotEmpty({ message: 'Tên không được để trống' })
+  name: string;
 
-  @IsString()
-  @Length(3, 100)
-  @Matches(NAME_REGEX, {
-    message: 'Tên không được có ký tự đặc biệt',
-  })
-  public name: string;
+  @IsString({ message: 'Mật khẩu phải là chuỗi' })
+  @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
+  password: string;
 }

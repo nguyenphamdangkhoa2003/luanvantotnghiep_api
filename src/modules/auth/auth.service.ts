@@ -7,128 +7,384 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '@/modules/users/users.service';
-import { LoginUserDto } from '@/modules/auth/dto/login-user.dto';
-import { CreateUserDto } from '@/modules/users/dto/create-user.dto';
-import { IJwtPayload, IUserToken } from './interfaces/types';
-import { ApiResponse } from '@/types';
+import { IAuthResult } from './interfaces/types';
+import { ApiResponse, IMessage } from '@/types';
 import { User, UserDocument } from '@/modules/users/schemas/user.schema';
-import { RefreshTokenService } from '@/modules/refresh-token/refresh-token.service';
-import { Types } from 'mongoose';
+import { Model } from 'mongoose';
 import { MailService } from '@/modules/mail/mail.service';
+import { InjectModel } from '@nestjs/mongoose';
+import {
+  BlacklistedToken,
+  BlacklistedTokenDocument,
+} from '@/modules/auth/schemas/blacklisted-token.schema';
+import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
+import { TokenTypeEnum } from '@/modules/jwt-auth/enums/types';
+import { SignUpDto } from '@/modules/auth/dto/sign-up.dto';
+import { SignInDto } from '@/modules/auth/dto/sign-in.dto';
+import { isEmail, isStrongPassword } from 'class-validator';
+import { SLUG_REGEX } from '@/common/constants/regex.constant';
+import * as dayjs from 'dayjs';
+import { Credentials } from '@/modules/users/schemas/credentials.schema';
+import { IRefreshToken } from '@/modules/jwt-auth/interfaces/refresh-token.interface';
 import { CommonService } from '@/modules/common/common.service';
-import { RegisterUserDto } from '@/modules/auth/dto/register-user.dto';
+import { EmailDto } from '@/modules/auth/dto/email.dto';
+import { isNull, isUndefined } from '@/common/utils/validation.util';
+import { ResetPasswordDto } from '@/modules/auth/dto/reset-password.dto';
+import { IEmailToken } from '@/modules/jwt-auth/interfaces/email-token.interface';
+import { ChangePasswordDto } from '@/modules/auth/dto/change-password.dto';
+import * as crypto from 'crypto';
+import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto';
+import { RefreshTokenDto } from '@/modules/auth/dto/refresh-token.dto';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name, { timestamp: true });
+
   constructor(
+    @InjectModel(BlacklistedToken.name)
+    private readonly blacklistedTokenModel: Model<BlacklistedTokenDocument>,
     private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
-    private readonly refreshTokenService: RefreshTokenService,
-    private readonly mailService: MailService,
+    private readonly jwtAuthService: JwtAuthService,
     private readonly commonService: CommonService,
+    private readonly mailService: MailService,
   ) {}
 
-  async signIn(signInData: LoginUserDto): Promise<ApiResponse<IUserToken>> {
-    const user = await this.usersService.findOne(
-      { email: signInData.email },
+  public generateMessage(message: string): IMessage {
+    return { id: crypto.randomUUID(), message };
+  }
+
+  public async validateUser({
+    emailOrUsername,
+    password,
+  }: SignInDto): Promise<UserDocument> {
+    const user = await this.userByEmailOrUsername(emailOrUsername);
+
+    if (!(await bcrypt.compare(password, user.password))) {
+      await this.checkLastPassword(user.credentials, password);
+    }
+
+    if (!user.isEmailVerified) {
+      const confirmationToken = await this.jwtAuthService.generateToken(
+        user,
+        TokenTypeEnum.CONFIRMATION,
+      );
+      await this.mailService.sendConfirmationEmail(user, confirmationToken);
+      throw new UnauthorizedException(
+        this.generateMessage(
+          'Vui lòng xác nhận email của bạn, một email mới đã được gửi',
+        ),
+      );
+    }
+
+    this.logger.log(`Người dùng ${user.email} đã được xác thực thành công`);
+    return user;
+  }
+  public async confirmEmail({ token }: ConfirmEmailDto): Promise<IMessage> {
+    // Alerts: Kiểm tra token không rỗng
+    if (!token) {
+      throw new BadRequestException(
+        this.generateMessage('Token xác nhận không được cung cấp'),
+      );
+    }
+
+    const { id, version } = await this.jwtAuthService.verifyToken<IEmailToken>(
+      token,
+      TokenTypeEnum.CONFIRMATION,
+    );
+
+    const user = await this.usersService.findOneByCredentials(id, version);
+    if (!user) {
+      throw new NotFoundException(
+        this.generateMessage('Người dùng không tồn tại'),
+      );
+    }
+    ``;
+    if (user.isEmailVerified) {
+      throw new BadRequestException(
+        this.generateMessage('Email đã được xác nhận'),
+      );
+    }
+
+    await this.usersService.updateEmailVerified(id, true);
+
+    this.logger.log(`Email của người dùng ${user.email} đã được xác nhận`);
+    return this.generateMessage('Xác nhận email thành công');
+  }
+  private async checkLastPassword(
+    credentials: Credentials,
+    password: string,
+  ): Promise<void> {
+    const { lastPassword, passwordUpdatedAt } = credentials;
+
+    if (
+      lastPassword.length === 0 ||
+      !(await bcrypt.compare(password, lastPassword))
+    ) {
+      throw new UnauthorizedException(
+        this.generateMessage('Thông tin đăng nhập không hợp lệ'),
+      );
+    }
+
+    const now = dayjs();
+    const time = dayjs.unix(passwordUpdatedAt);
+    const months = now.diff(time, 'month');
+    const message = 'Bạn đã thay đổi mật khẩu ';
+
+    if (months > 0) {
+      throw new UnauthorizedException(
+        this.generateMessage(
+          message + months + (months > 1 ? ' tháng trước' : ' tháng trước'),
+        ),
+      );
+    }
+
+    const days = now.diff(time, 'day');
+    if (days > 0) {
+      throw new UnauthorizedException(
+        this.generateMessage(
+          message + days + (days > 1 ? ' ngày trước' : ' ngày trước'),
+        ),
+      );
+    }
+
+    const hours = now.diff(time, 'hour');
+    if (hours > 0) {
+      throw new UnauthorizedException(
+        this.generateMessage(
+          message + hours + (hours > 1 ? ' giờ trước' : ' giờ trước'),
+        ),
+      );
+    }
+
+    throw new UnauthorizedException(this.generateMessage(message + 'gần đây'));
+  }
+
+  private async userByEmailOrUsername(
+    emailOrUsername: string,
+  ): Promise<UserDocument> {
+    if (emailOrUsername.includes('@')) {
+      if (!isEmail(emailOrUsername)) {
+        throw new BadRequestException(
+          this.generateMessage('Email không hợp lệ'),
+        );
+      }
+      const user = await this.usersService.findOneByEmail(emailOrUsername);
+      if (!user) {
+        throw new NotFoundException(
+          this.generateMessage('Không tìm thấy người dùng'),
+        );
+      }
+      return user;
+    }
+
+    if (
+      emailOrUsername.length < 3 ||
+      emailOrUsername.length > 106 ||
+      !SLUG_REGEX.test(emailOrUsername)
+    ) {
+      throw new BadRequestException(
+        this.generateMessage('Tên người dùng không hợp lệ'),
+      );
+    }
+
+    const user = await this.usersService.findOneByUsername(
+      emailOrUsername,
       true,
     );
     if (!user) {
-      this.logger.error(`🚨 Login failed: User ${signInData.email} not found`);
-      throw new UnauthorizedException(
-        'Tài khoản hoặc mật khẩu không chính xác',
-      );
-    }
-
-    const match = await bcrypt.compare(signInData.password, user.password);
-    if (!match) {
-      this.logger.error(
-        `🚨 Login failed: Incorrect password for ${signInData.email}`,
-      );
-      throw new UnauthorizedException(
-        'Tài khoản hoặc mật khẩu không chính xác',
-      );
-    }
-    const token = await this.generateUserToken({
-      userId: user._id,
-      email: user.email,
-    });
-    this.logger.log(`🚀 User ${signInData.email} signed in successfully`);
-
-    return {
-      message: 'success',
-      code: 200,
-      data: token,
-    };
-  }
-
-  public async signup(
-    data: CreateUserDto,
-  ): Promise<ApiResponse<Omit<User, 'password'>>> {
-    const { email, name, password } = data;
-    const user = await this.usersService.create(email, name, password);
-    const token = Math.floor(1000 + Math.random() * 9000).toString();
-    await this.mailService.sendUserConfirmation(user, token);
-    return {
-      message: 'success',
-      code: 201,
-      data: user,
-    };
-  }
-
-  public async validateUser({ email, password }: LoginUserDto) {
-    const user = await this.usersService.findOne({ email }, true);
-    if (!user) {
-      this.logger.error(`🚨 Login failed: User ${email} not found`);
-      throw new UnauthorizedException(
-        'Tài khoản hoặc mật khẩu không chính xác',
-      );
-    }
-
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      console.log(match);
-      this.logger.error(`🚨 Login failed: Incorrect password for ${email}`);
-      throw new UnauthorizedException(
-        'Tài khoản hoặc mật khẩu không chính xác',
+      throw new NotFoundException(
+        this.generateMessage('Không tìm thấy người dùng'),
       );
     }
     return user;
   }
-  public async refreshTokens(refreshToken: string) {
-    const token = await this.refreshTokenService.findOneAndDelete(refreshToken);
 
-    if (!token) {
-      throw new UnauthorizedException('Token không hợp lệ');
+  public async signUp(dto: SignUpDto, domain?: string): Promise<ApiResponse> {
+    const { name, email, password1, password2 } = dto;
+    this.comparePasswords(password1, password2);
+    if (!isStrongPassword(password1)) {
+      throw new BadRequestException('Mật khẩu không đủ mạnh');
     }
+    const user = await this.usersService.create({
+      email,
+      name,
+      password: password1,
+    });
+    const confirmationToken = await this.jwtAuthService.generateToken(
+      user,
+      TokenTypeEnum.CONFIRMATION,
+      domain,
+    );
+    await this.mailService.sendConfirmationEmail(user, confirmationToken);
 
-    const user = await this.usersService.findOne({ _id: token.userId });
+    this.logger.log(`Người dùng mới ${email} đã đăng ký thành công`);
+    return {
+      code: 200,
+      data: user,
+      message: 'Đăng ký thành công',
+    };
+  }
 
-    if (!user)
-      throw new NotFoundException(
-        `Không tìm thấy người dùng với #id: ${token.userId}`,
+  private comparePasswords(password1: string, password2: string): void {
+    if (password1 !== password2) {
+      throw new BadRequestException(
+        this.generateMessage('Mật khẩu không khớp'),
+      );
+    }
+  }
+
+  public async generateAuthTokens(
+    user: User,
+    domain?: string,
+    tokenId?: string,
+  ): Promise<[string, string]> {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtAuthService.generateToken(
+        user,
+        TokenTypeEnum.ACCESS,
+        domain,
+        tokenId,
+      ),
+      this.jwtAuthService.generateToken(
+        user,
+        TokenTypeEnum.REFRESH,
+        domain,
+        tokenId,
+      ),
+    ]);
+
+    this.logger.debug(`Đã tạo token cho người dùng ${user.email}`);
+    return [accessToken, refreshToken];
+  }
+
+  public async refreshTokenAccess({
+    refreshToken,
+    domain,
+  }: RefreshTokenDto): Promise<IAuthResult> {
+    const { id, version, tokenId } =
+      await this.jwtAuthService.verifyToken<IRefreshToken>(
+        refreshToken,
+        TokenTypeEnum.REFRESH,
       );
 
-    return this.generateUserToken({ userId: token.userId, email: user.email });
-  }
-  public async generateUserToken({
-    userId,
-    email,
-  }: {
-    userId: Types.ObjectId;
-    email: string;
-  }): Promise<IUserToken> {
-    const payload: IJwtPayload = { sub: userId, email };
-    const access_token = await this.jwtService.signAsync(payload);
-    const refresh_token = crypto.randomUUID();
+    await this.checkIfTokenIsBlacklisted(id, tokenId);
+    const user = await this.usersService.findOneByCredentials(id, version);
+    ``;
+    if (!user) {
+      throw new UnauthorizedException(
+        this.generateMessage('Người dùng không tồn tại'),
+      );
+    }
 
-    await this.refreshTokenService.create({ userId, token: refresh_token });
+    const [accessToken, newRefreshToken] = await this.generateAuthTokens(
+      user,
+      domain,
+      tokenId,
+    );
+
+    this.logger.log(`Đã làm mới token cho người dùng ${user.email}`);
+    return { user, accessToken, refreshToken: newRefreshToken };
+  }
+
+  private async checkIfTokenIsBlacklisted(
+    userId: string,
+    tokenId: string,
+  ): Promise<void> {
+    const blacklistedToken = await this.blacklistedTokenModel
+      .findOne({
+        user: userId,
+        tokenId,
+      })
+      .lean();
+
+    if (blacklistedToken) {
+      throw new UnauthorizedException(
+        this.generateMessage('Token không hợp lệ'),
+      );
+    }
+  }
+
+  public async logout(refreshToken: string): Promise<IMessage> {
+    const { id, tokenId } =
+      await this.jwtAuthService.verifyToken<IRefreshToken>(
+        refreshToken,
+        TokenTypeEnum.REFRESH,
+      );
+
+    await this.blacklistToken(id, tokenId);
+    this.logger.log(`Người dùng ${id} đã đăng xuất thành công`);
+    return this.generateMessage('Đăng xuất thành công');
+  }
+
+  private async blacklistToken(userId: string, tokenId: string): Promise<void> {
+    const blacklistedToken = await this.blacklistedTokenModel.create({
+      user: userId,
+      tokenId,
+    });
+    await this.commonService.saveEntity(
+      this.blacklistedTokenModel,
+      blacklistedToken,
+      true,
+    );
+  }
+
+  public async resetPasswordEmail(
+    dto: EmailDto,
+    domain?: string,
+  ): Promise<IMessage> {
+    const user = await this.usersService.uncheckedUserByEmail(dto.email);
+
+    if (!isUndefined(user) && !isNull(user)) {
+      const resetToken = await this.jwtAuthService.generateToken(
+        user,
+        TokenTypeEnum.RESET_PASSWORD,
+        domain,
+      );
+
+      await this.mailService.sendResetPasswordEmail(user, resetToken);
+      this.logger.log(`Đã gửi email đặt lại mật khẩu cho ${dto.email}`);
+    }
+
+    return this.generateMessage('Email đặt lại mật khẩu đã được gửi');
+  }
+
+  public async resetPassword(dto: ResetPasswordDto): Promise<ApiResponse> {
+    const { password1, password2, resetToken } = dto;
+    const { id, version } = await this.jwtAuthService.verifyToken<IEmailToken>(
+      resetToken,
+      TokenTypeEnum.RESET_PASSWORD,
+    );
+    ``;
+    this.comparePasswords(password1, password2);
+    await this.usersService.resetPassword({
+      userId: id,
+      password: password1,
+      version,
+    });
     return {
-      access_token,
-      refresh_token,
+      code: 200,
+      message: 'Đặt lại mật khẩu thành công',
     };
+  }
+
+  public async changePassword(
+    userId: string,
+    dto: ChangePasswordDto,
+  ): Promise<IAuthResult> {
+    const { password1, password2, password } = dto;
+    this.comparePasswords(password1, password2);
+
+    const user = await this.usersService.updatePassword(
+      {
+        newPassword: password2,
+        oldPassword: password,
+      },
+      userId,
+    );
+    const [accessToken, refreshToken] = await this.generateAuthTokens(user);
+
+    this.logger.log(`Mật khẩu của người dùng ${userId} đã được thay đổi`);
+    return { user, accessToken, refreshToken };
   }
 }

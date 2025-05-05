@@ -13,6 +13,7 @@ import {
   Matches,
 } from 'class-validator';
 import { NAME_REGEX, SLUG_REGEX } from '@/common/constants/regex.constant';
+import { Credentials, CredentialsSchema } from '@/modules/users/schemas/credentials.schema';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -63,7 +64,7 @@ export class User {
 
   @Prop({ default: false, type: Boolean })
   @IsBoolean()
-  public isVerified: boolean;
+  public isEmailVerified: boolean;
 
   @Prop({ type: String })
   @IsOptional()
@@ -90,6 +91,9 @@ export class User {
   })
   @IsEnum(OAuthProvidersEnum, { message: 'Invalid OAuth provider' })
   public provider: OAuthProvidersEnum;
+
+  @Prop({ type: CredentialsSchema, default: () => ({})})
+  public credentials: Credentials;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

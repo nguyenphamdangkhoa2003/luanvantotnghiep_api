@@ -1,36 +1,38 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import { User } from '@/modules/users/schemas/user.schema';
+import { ConfigService } from '@nestjs/config';
+import { IEmailConfig } from '@/config/interface/email-config.interface';
 
 @Injectable()
 export class MailService {
   private readonly logger: Logger;
-
-  constructor(private mailerService: MailerService) {
+  private readonly email: string;
+  private readonly domain: string;
+  constructor(
+    private mailerService: MailerService,
+    private readonly configService: ConfigService,
+  ) {
     this.logger = new Logger(MailService.name);
+    const emailConfig = this.configService.get<IEmailConfig>('emailService')!;
+    this.email = `XeShare <${emailConfig.auth.user}>`;
+    this.domain = this.configService.get<string>('domain')!;
   }
 
-  async sendUserConfirmation(user: User, token: string) {
-    // Dữ liệu giả để test
-
-    const mockToken = token || 'mock-token-123456789';
-    const verificationLink = `http://example.com/auth/confirm?token=${mockToken}`;
-    const unsubscribeLink = `http://example.com/unsubscribe?email=${user.email}`;
-    const preferencesLink = `http://example.com/preferences?email=${user.email}`;
-    const code = '6289'; // Mã xác thực giả, thay bằng logic tạo mã ngẫu nhiên nếu cần
+  public async sendConfirmationEmail(user: User, token: string): Promise<void> {
+    const { email, name } = user;
+    const link = `http://${this.domain}/auth/confirm-email/${token}`;
 
     try {
       await this.mailerService.sendMail({
-        to: user.email,
-        subject: 'Welcome to Nice App! Confirm your Email',
-        template: './confirmation', // File confirmation.hbs
+        to: email,
+        subject: 'Welcome to XeShare! Confirm your Email',
+        template: './confirmation',
         context: {
-          name: user.name,
-          code: code.split(''), // Chuyển mã thành mảng: ['6', '2', '8', '9']
-          verificationLink,
-          email: user.email,
-          unsubscribeLink,
-          preferencesLink,
+          app: 'XeShare',
+          name,
+          email,
+          link,
           year: new Date().getFullYear(),
         },
       });
@@ -42,6 +44,34 @@ export class MailService {
         error.stack,
       );
       throw new Error(`Failed to send confirmation email: ${error.message}`);
+    }
+  }
+
+  public async sendResetPasswordEmail(user: User, token: string) {
+    const { email, name } = user;
+    const link = `http://${this.domain}/auth/reset-password/${token}`;
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'Reset your password',
+        template: './reset_password',
+        context: {
+          app: 'XeShare',
+          name,
+          email,
+          myMail: this.email,
+          link,
+          year: new Date().getFullYear(),
+        },
+      });
+
+      this.logger.log(`Mail sent successfully to ${user.email} 🎉📨`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send mail to ${user.email}: ${error.message}`,
+        error.stack,
+      );
+      throw new Error(`Failed to send reset password email: ${error.message}`);
     }
   }
 }

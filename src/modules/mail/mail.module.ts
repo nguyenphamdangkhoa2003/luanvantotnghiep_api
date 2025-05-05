@@ -4,7 +4,7 @@ import { Global, Module } from '@nestjs/common';
 import { MailService } from './mail.service';
 import { join } from 'path';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { IEmailConfig } from '@/config/app/interface/email-config.interface';
+import { IEmailConfig } from '@/config/interface/email-config.interface';
 
 @Global()
 @Module({
@@ -15,7 +15,7 @@ import { IEmailConfig } from '@/config/app/interface/email-config.interface';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const emailConfig: IEmailConfig =
-          configService.get<IEmailConfig>('emailSerivce')!;
+          configService.get<IEmailConfig>('emailService')!;
         return {
           transport: {
             host: emailConfig.host,
