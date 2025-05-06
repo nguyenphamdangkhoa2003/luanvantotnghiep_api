@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -11,13 +12,7 @@ import { UsersService } from '@/modules/users/users.service';
 import { IAuthResult } from './interfaces/types';
 import { ApiResponse, IMessage } from '@/types';
 import { User, UserDocument } from '@/modules/users/schemas/user.schema';
-import { Model } from 'mongoose';
 import { MailService } from '@/modules/mail/mail.service';
-import { InjectModel } from '@nestjs/mongoose';
-import {
-  BlacklistedToken,
-  BlacklistedTokenDocument,
-} from '@/modules/auth/schemas/blacklisted-token.schema';
 import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
 import { TokenTypeEnum } from '@/modules/jwt-auth/enums/types';
 import { SignUpDto } from '@/modules/auth/dto/sign-up.dto';
@@ -27,7 +22,6 @@ import { SLUG_REGEX } from '@/common/constants/regex.constant';
 import * as dayjs from 'dayjs';
 import { Credentials } from '@/modules/users/schemas/credentials.schema';
 import { IRefreshToken } from '@/modules/jwt-auth/interfaces/refresh-token.interface';
-import { CommonService } from '@/modules/common/common.service';
 import { EmailDto } from '@/modules/auth/dto/email.dto';
 import { isNull, isUndefined } from '@/common/utils/validation.util';
 import { ResetPasswordDto } from '@/modules/auth/dto/reset-password.dto';
@@ -36,18 +30,19 @@ import { ChangePasswordDto } from '@/modules/auth/dto/change-password.dto';
 import * as crypto from 'crypto';
 import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto';
 import { RefreshTokenDto } from '@/modules/auth/dto/refresh-token.dto';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { CommonService } from '@/modules/common/common.service';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name, { timestamp: true });
 
   constructor(
-    @InjectModel(BlacklistedToken.name)
-    private readonly blacklistedTokenModel: Model<BlacklistedTokenDocument>,
+    private readonly commonService: CommonService,
     private readonly usersService: UsersService,
     private readonly jwtAuthService: JwtAuthService,
-    private readonly commonService: CommonService,
     private readonly mailService: MailService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   public generateMessage(message: string): IMessage {
@@ -80,8 +75,8 @@ export class AuthService {
     this.logger.log(`Người dùng ${user.email} đã được xác thực thành công`);
     return user;
   }
+
   public async confirmEmail({ token }: ConfirmEmailDto): Promise<IMessage> {
-    // Alerts: Kiểm tra token không rỗng
     if (!token) {
       throw new BadRequestException(
         this.generateMessage('Token xác nhận không được cung cấp'),
@@ -99,7 +94,7 @@ export class AuthService {
         this.generateMessage('Người dùng không tồn tại'),
       );
     }
-    ``;
+
     if (user.isEmailVerified) {
       throw new BadRequestException(
         this.generateMessage('Email đã được xác nhận'),
@@ -111,6 +106,7 @@ export class AuthService {
     this.logger.log(`Email của người dùng ${user.email} đã được xác nhận`);
     return this.generateMessage('Xác nhận email thành công');
   }
+
   private async checkLastPassword(
     credentials: Credentials,
     password: string,
@@ -270,7 +266,6 @@ export class AuthService {
 
     await this.checkIfTokenIsBlacklisted(id, tokenId);
     const user = await this.usersService.findOneByCredentials(id, version);
-    ``;
     if (!user) {
       throw new UnauthorizedException(
         this.generateMessage('Người dùng không tồn tại'),
@@ -291,42 +286,41 @@ export class AuthService {
     userId: string,
     tokenId: string,
   ): Promise<void> {
-    const blacklistedToken = await this.blacklistedTokenModel
-      .findOne({
-        user: userId,
-        tokenId,
-      })
-      .lean();
+    const time = await this.cacheManager.get<number>(
+      `blacklist:${userId}:${tokenId}`,
+    );
 
-    if (blacklistedToken) {
-      throw new UnauthorizedException(
-        this.generateMessage('Token không hợp lệ'),
-      );
+    if (!isUndefined(time) && !isNull(time)) {
+      throw new UnauthorizedException('Token không hợp lệ');
     }
   }
 
   public async logout(refreshToken: string): Promise<IMessage> {
-    const { id, tokenId } =
+    const { id, tokenId, exp } =
       await this.jwtAuthService.verifyToken<IRefreshToken>(
         refreshToken,
         TokenTypeEnum.REFRESH,
       );
-
-    await this.blacklistToken(id, tokenId);
+    await this.blacklistToken(id, tokenId, exp);
     this.logger.log(`Người dùng ${id} đã đăng xuất thành công`);
     return this.generateMessage('Đăng xuất thành công');
   }
 
-  private async blacklistToken(userId: string, tokenId: string): Promise<void> {
-    const blacklistedToken = await this.blacklistedTokenModel.create({
-      user: userId,
-      tokenId,
-    });
-    await this.commonService.saveEntity(
-      this.blacklistedTokenModel,
-      blacklistedToken,
-      true,
-    );
+  private async blacklistToken(
+    userId: string,
+    tokenId: string,
+    exp: number,
+  ): Promise<void> {
+    const now = dayjs().unix();
+    const ttl = (exp - now) * 1000;
+
+    if (ttl > 0) {
+      await this.commonService.throwInternalError(
+        this.cacheManager.set(`blacklist:${userId}:${tokenId}`, now, ttl),
+      );
+    }
+
+    console.log(`blacklist:${userId}:${tokenId}`);
   }
 
   public async resetPasswordEmail(
@@ -355,7 +349,7 @@ export class AuthService {
       resetToken,
       TokenTypeEnum.RESET_PASSWORD,
     );
-    ``;
+
     this.comparePasswords(password1, password2);
     await this.usersService.resetPassword({
       userId: id,

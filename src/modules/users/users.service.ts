@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -13,7 +14,7 @@ import { CommonService } from '@/modules/common/common.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import dayjs from 'dayjs';
+import * as dayjs from 'dayjs';
 
 @Injectable()
 export class UsersService {
@@ -29,22 +30,20 @@ export class UsersService {
   // Highlights: Tạo người dùng với email, tên và mật khẩu từ DTO
   async create(dto: CreateUserDto): Promise<UserDocument> {
     const { email, name, password } = dto;
+    const formattedEmail = email.toLowerCase();
+    const formattedName = this.commonService.formatName(name);
 
-    // Alerts: Kiểm tra email đã tồn tại
-    const existingUser = await this.findOneByEmail(email);
-    if (existingUser) {
-      throw new BadRequestException(
-        this.commonService.generateMessage('Email đã được sử dụng'),
-      );
-    }
+    await this.checkEmailUniqueness(formattedEmail);
 
     this.logger.log(`Tạo người dùng mới với email: ${email}`);
 
-    // Queries: Tạo người dùng mới
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new this.userModel({
-      email: email.toLowerCase(),
-      name: this.commonService.formatName(name),
+      _id: new Types.ObjectId(),
+      email: formattedEmail,
+      name: formattedName,
+      username: await this.generateUsername(formattedName),
+      password,
       credentials: {
         version: 0,
         password: hashedPassword,
@@ -61,6 +60,28 @@ export class UsersService {
     return user;
   }
 
+  private async generateUsername(name: string): Promise<string> {
+    const pointSlug = this.commonService.generatePointSlug(name);
+    const users = await this.userModel.find({
+      username: {
+        $regex: `^${pointSlug}`, // Matches usernames starting with pointSlug
+        $options: 'i', // Case-insensitive matching (optional)
+      },
+    });
+
+    if (users.length > 0) {
+      return `${pointSlug}${users.length}`;
+    }
+
+    return pointSlug;
+  }
+  public async checkEmailUniqueness(email: string): Promise<void> {
+    const users = await this.userModel.find({ email });
+
+    if (users.length > 0) {
+      throw new ConflictException('Email already in use');
+    }
+  }
   // Tìm người dùng theo email
   // Highlights: Tìm người dùng với email, trả về null nếu không tồn tại
   async findOneByEmail(email: string): Promise<UserDocument | null> {

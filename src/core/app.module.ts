@@ -5,9 +5,11 @@ import configuration, { configModuleOptions } from '@/config/configuration';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { AuthModule } from '@/modules/auth/auth.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailModule } from '@/modules/mail/mail.module';
 import { CommonModule } from '@/modules/common/common.module';
+import { CacheModule } from '@nestjs/cache-manager';
+import { CacheConfig } from '@/config/cache.config';
 
 const dbLogger = new Logger('Database');
 
@@ -34,6 +36,11 @@ const logDatabaseConnection = () => {
       },
     }),
     AuthModule,
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      useClass: CacheConfig,
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],

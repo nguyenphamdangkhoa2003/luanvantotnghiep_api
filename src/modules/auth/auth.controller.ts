@@ -58,11 +58,6 @@ export class AuthController {
   @Public()
   @Post('signup')
   async signup(@Body() data: SignUpDto): Promise<ApiResponse> {
-    if (!data.email || !data.name || !data.password1 || !data.password2) {
-      throw new BadRequestException(
-        this.authService.generateMessage('Dữ liệu đăng ký không đầy đủ'),
-      );
-    }
     const response = await this.authService.signUp(data);
     this.logger.log(`Đăng ký thành công cho email ${data.email}`);
     return response;

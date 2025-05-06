@@ -12,6 +12,7 @@ import { plainToInstance } from 'class-transformer';
 import { IAppConfig } from '@/config/interface/app.interface';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { redisUrlParser } from '@/common/utils/redis-url-parser.util';
 
 class ConfigSchema {
   @IsString()
@@ -96,6 +97,10 @@ class ConfigSchema {
   @IsString()
   @IsNotEmpty({ message: 'Không tìm thấy domain' })
   DOMAIN: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Không tìm thấy redis url' })
+  REDIS_URL: string;
 }
 
 export const configModuleOptions: ConfigModuleOptions = {
@@ -182,6 +187,7 @@ export default (): IAppConfig => {
     EMAIL_SECURE: process.env.EMAIL_SECURE === 'true',
     EMAIL_USER: process.env.EMAIL_USER,
     EMAIL_PASSWORD: process.env.EMAIL_PASSWORD,
+    REDIS_URL: process.env.REDIS_URL,
   });
 
   return {
@@ -230,5 +236,6 @@ export default (): IAppConfig => {
       clientSecret: env.GOOGLE_SECRET,
       callbackUrl: env.GOOGLE_CALLBACK_URL,
     },
+    redis: redisUrlParser(env.REDIS_URL),
   };
 };
