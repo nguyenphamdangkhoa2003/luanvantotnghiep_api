@@ -9,7 +9,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailModule } from '@/modules/mail/mail.module';
 import { CommonModule } from '@/modules/common/common.module';
 import { CacheModule } from '@nestjs/cache-manager';
-import { CacheConfig } from '@/config/cache.config';
 
 const dbLogger = new Logger('Database');
 
@@ -36,10 +35,9 @@ const logDatabaseConnection = () => {
       },
     }),
     AuthModule,
-    CacheModule.registerAsync({
+    CacheModule.register({
       isGlobal: true,
-      imports: [ConfigModule],
-      useClass: CacheConfig,
+      ttl: configuration().jwt.refresh.time,
     }),
   ],
   controllers: [AppController],

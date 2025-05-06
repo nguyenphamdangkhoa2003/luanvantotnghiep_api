@@ -43,8 +43,18 @@ export class AuthService {
     private readonly jwtAuthService: JwtAuthService,
     private readonly mailService: MailService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) {}
-
+  ) {
+    this.testCacheConnection();
+  }
+  async testCacheConnection() {
+    try {
+      await this.cacheManager.set('test-connection', 'ok', 60);
+      const value = await this.cacheManager.get('test-connection');
+      console.log('Redis connection test:', value); // Nên in ra "ok"
+    } catch (err) {
+      console.error('Redis connection error:', err);
+    }
+  }
   public generateMessage(message: string): IMessage {
     return { id: crypto.randomUUID(), message };
   }

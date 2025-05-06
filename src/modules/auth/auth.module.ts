@@ -7,6 +7,7 @@ import { PassportModule } from '@nestjs/passport';
 import { SessionSerializer } from '@/modules/auth/session.serializer';
 import { AuthenticatedGuard } from '@/modules/auth/guard/authenticated.guard';
 import { JwtAuthModule } from '@/modules/jwt-auth/jwt-auth.module';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
