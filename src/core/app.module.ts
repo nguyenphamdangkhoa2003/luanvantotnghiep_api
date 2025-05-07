@@ -11,6 +11,8 @@ import { CommonModule } from '@/modules/common/common.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerConfig } from '@/config/throttler.config';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from '@/modules/auth/guard/jwt-auth.guard';
 
 const dbLogger = new Logger('Database');
 
@@ -47,6 +49,12 @@ const logDatabaseConnection = () => {
     }),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}

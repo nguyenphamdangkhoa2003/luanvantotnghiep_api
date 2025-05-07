@@ -22,7 +22,7 @@ import { GoogleStrategy } from '@/modules/auth/strategies/google.strategy';
     LocalStrategy,
     SessionSerializer,
     AuthenticatedGuard,
-    GoogleStrategy
+    GoogleStrategy,
   ],
 })
 export class AuthModule {}
