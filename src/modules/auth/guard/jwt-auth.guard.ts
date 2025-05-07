@@ -6,16 +6,17 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '@/modules/auth/decorators/public.decorators';
-import { IJwtPayload } from '@/modules/auth/interfaces/types';
+import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
+import { TokenTypeEnum } from '@/modules/jwt-auth/enums/types';
+import { IAccessToken } from '@/modules/jwt-auth/interfaces/access-token.interface';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
-    private jwtService: JwtService,
+    private jwtAuthService: JwtAuthService,
     private configService: ConfigService,
     private reflector: Reflector, // Inject Reflector để kiểm tra metadata
   ) {}
@@ -34,17 +35,20 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromHeader(request);
     if (!token) {
-      throw new UnauthorizedException('Token không hợp lệ');
+      throw new UnauthorizedException(
+        'Không tìm thấy access token trong header',
+      );
     }
 
     try {
-      const payload: IJwtPayload = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.get<string>('jwt.secret'),
-      });
-      request.user = payload; // Gắn payload vào request để sử dụng ở các controller
+      const payload = await this.jwtAuthService.verifyToken<IAccessToken>(
+        token,
+        TokenTypeEnum.ACCESS,
+      );
+      request.user = payload;
     } catch (e) {
       Logger.error(e.message);
-      throw new UnauthorizedException('Token không hợp lệ');
+      throw new UnauthorizedException(e.message);
     }
 
     return true;

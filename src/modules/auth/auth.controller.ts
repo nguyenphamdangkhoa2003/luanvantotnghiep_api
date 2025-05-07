@@ -60,6 +60,7 @@ export class AuthController {
       data: { user: req.user, accessToken, refreshToken },
     };
   }
+  
   @Public()
   @UseGuards(AuthGuard('google'))
   @Get('google')
@@ -124,7 +125,6 @@ export class AuthController {
     return response;
   }
 
-  @Public()
   @Post('refresh-token')
   async refreshToken(
     @Body('refreshToken') refreshToken: string,

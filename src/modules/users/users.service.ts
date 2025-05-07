@@ -354,7 +354,7 @@ export class UsersService {
   }
 
   public async findOneById(id: Types.ObjectId): Promise<UserDocument | null> {
-    const user = await this.userModel.findOne({ id }).select('+password');
+    const user = await this.userModel.findById(id).select('+password');
     this.commonService.checkEntityExistence(user, User.name);
     return user;
   }

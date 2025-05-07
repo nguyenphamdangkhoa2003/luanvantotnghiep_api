@@ -2,7 +2,8 @@ import { PassportSerializer } from '@nestjs/passport';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '@/modules/users/users.service';
 import { User } from '@/modules/users/schemas/user.schema';
-import { IJwtPayload } from '@/modules/auth/interfaces/types';
+import { IAccessPayload } from '@/modules/jwt-auth/interfaces/access-token.interface';
+import { Types } from 'mongoose';
 
 @Injectable()
 export class SessionSerializer extends PassportSerializer {
@@ -12,19 +13,25 @@ export class SessionSerializer extends PassportSerializer {
 
   serializeUser(
     user: User,
-    done: (err: Error | null, payload: IJwtPayload) => void,
+    done: (err: Error | null, payload: IAccessPayload) => void,
   ): void {
-    done(null, { sub: user._id, email: user.email });
+    done(null, { id: user._id.toString() });
   }
 
   async deserializeUser(
-    payload: IJwtPayload,
+    payload: IAccessPayload,
     done: (err: Error | null, user: User | null) => void,
   ): Promise<void> {
     try {
-      const user = await this.userService.findOneByEmail(payload.email);
+      console.log(payload.id);
+      const user = await this.userService.findOneById(
+        new Types.ObjectId(payload.id),
+      );
       if (!user) {
-        return done(new UnauthorizedException('User not found'), null);
+        return done(
+          new UnauthorizedException('Không tìm thấy người dùng'),
+          null,
+        );
       }
       return done(null, user);
     } catch (error) {

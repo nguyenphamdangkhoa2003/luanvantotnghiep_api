@@ -269,7 +269,7 @@ export class AuthService {
     return { user, accessToken, refreshToken: newRefreshToken };
   }
 
-  private async checkIfTokenIsBlacklisted(
+  public async checkIfTokenIsBlacklisted(
     userId: string,
     tokenId: string,
   ): Promise<void> {

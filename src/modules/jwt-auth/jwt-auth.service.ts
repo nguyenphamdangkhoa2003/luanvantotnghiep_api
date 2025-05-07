@@ -139,6 +139,7 @@ export class JwtAuthService {
             maxAge: accessTime,
             algorithms: ['RS256'],
           }),
+          TokenTypeEnum.ACCESS,
         );
       case TokenTypeEnum.REFRESH:
       case TokenTypeEnum.CONFIRMATION:
@@ -150,23 +151,33 @@ export class JwtAuthService {
             maxAge: time,
             algorithms: ['HS256'],
           }),
+          'Token',
         );
     }
   }
 
   private static async throwBadRequest<
     T extends IAccessToken | IRefreshToken | IEmailToken,
-  >(promise: Promise<T>): Promise<T> {
+  >(promise: Promise<T>, tokenType: TokenTypeEnum | string): Promise<T> {
     try {
       return await promise;
     } catch (error) {
+      const tokenTypeName = tokenType
+        .toString()
+        .replace(/_/g, ' ')
+        .toLowerCase();
+      const capitalizedTokenType =
+        tokenTypeName.charAt(0).toUpperCase() + tokenTypeName.slice(1);
+
       if (error instanceof TokenExpiredError) {
-        throw new BadRequestException('Token đã hết hạn');
+        throw new BadRequestException(`${capitalizedTokenType} đã hết hạn`);
       }
       if (error instanceof JsonWebTokenError) {
-        throw new BadRequestException('Token không hợp lệ');
+        throw new BadRequestException(`${capitalizedTokenType} không hợp lệ`);
       }
-      throw new InternalServerErrorException('Lỗi không xác định: ' + error);
+      throw new InternalServerErrorException(
+        `Lỗi không xác định với ${tokenTypeName}: ${error.message}`,
+      );
     }
   }
 
