@@ -9,11 +9,20 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  IsUrl,
   Length,
   Matches,
 } from 'class-validator';
-import { NAME_REGEX, SLUG_REGEX } from '@/common/constants/regex.constant';
-import { Credentials, CredentialsSchema } from '@/modules/users/schemas/credentials.schema';
+import {
+  BCRYPT_HASH_OR_UNSET,
+  NAME_REGEX,
+  SLUG_REGEX,
+} from '@/common/constants/regex.constant';
+import {
+  Credentials,
+  CredentialsSchema,
+} from '@/modules/users/schemas/credentials.schema';
+import { OAuthProvider } from '@/modules/auth/schemas/oauth-provider.schema';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -51,6 +60,7 @@ export class User {
   @Prop({ required: true, type: String })
   @IsString()
   @Length(8, 100, { message: 'Password must be between 8 and 100 characters' })
+  @Matches(BCRYPT_HASH_OR_UNSET)
   public password: string;
 
   @Prop({ type: String })
@@ -66,16 +76,6 @@ export class User {
   @IsBoolean()
   public isEmailVerified: boolean;
 
-  @Prop({ type: String })
-  @IsOptional()
-  @IsString()
-  public resetPasswordToken: string;
-
-  @Prop({ type: Date })
-  @IsOptional()
-  @IsDate()
-  public resetPasswordExpires: Date;
-
   @Prop({ type: Date, default: Date.now })
   @IsDate()
   public createdAt: Date;
@@ -84,24 +84,16 @@ export class User {
   @IsDate()
   public updatedAt: Date;
 
-  @Prop({
-    enum: OAuthProvidersEnum,
-    default: OAuthProvidersEnum.LOCAL,
-    type: String,
-  })
-  @IsEnum(OAuthProvidersEnum, { message: 'Invalid OAuth provider' })
-  public provider: OAuthProvidersEnum;
+  @Prop([{ type: Types.ObjectId, ref: 'OAuthProvider' }])
+  oauthProviders: OAuthProvider[];
 
-  @Prop({ type: CredentialsSchema, default: () => ({})})
+  @Prop({ type: CredentialsSchema, default: () => ({}) })
   public credentials: Credentials;
+
+  @Prop({ required: false })
+  @IsUrl()
+  @IsOptional()
+  avatar: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
-
-// Middleware để mã hóa mật khẩu trước khi lưu
-UserSchema.pre('save', async function (next) {
-  if (this.isModified('password')) {
-    this.password = await bcrypt.hash(this.password, 10);
-  }
-  next();
-});

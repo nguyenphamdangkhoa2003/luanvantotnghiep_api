@@ -18,6 +18,10 @@ async function bootstrap() {
         logLevels: ['log'],
       }),
     });
+    app.enableCors({
+      origin: 'http://localhost:3001', 
+      credentials: true,
+    });
     const configService = app.get(ConfigService);
     const sessionOptions: session.SessionOptions = {
       secret: configService.get<string>('session.secret') as CipherKey,

@@ -32,6 +32,9 @@ import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto';
 import { RefreshTokenDto } from '@/modules/auth/dto/refresh-token.dto';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { CommonService } from '@/modules/common/common.service';
+import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
+import { OAuthProvider } from './schemas/oauth-provider.schema';
+import { SignInByGoogleDto } from './dto/sign-in-by-google.dto';
 
 @Injectable()
 export class AuthService {
@@ -43,18 +46,8 @@ export class AuthService {
     private readonly jwtAuthService: JwtAuthService,
     private readonly mailService: MailService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) {
-    this.testCacheConnection();
-  }
-  async testCacheConnection() {
-    try {
-      await this.cacheManager.set('test-connection', 'ok', 60);
-      const value = await this.cacheManager.get('test-connection');
-      console.log('Redis connection test:', value); // Nên in ra "ok"
-    } catch (err) {
-      console.error('Redis connection error:', err);
-    }
-  }
+  ) {}
+
   public generateMessage(message: string): IMessage {
     return { id: crypto.randomUUID(), message };
   }
@@ -86,6 +79,16 @@ export class AuthService {
     return user;
   }
 
+  public async validateEmailUser(data: SignInByGoogleDto) {
+    const user = await this.usersService.findOrCreate({
+      email: data.email,
+      name: data.name,
+      provider: OAuthProvidersEnum.GOOGLE,
+      isEmailVerified: true,
+      avatar: data.avatar,
+    });
+    return user;
+  }
   public async confirmEmail({ token }: ConfirmEmailDto): Promise<IMessage> {
     if (!token) {
       throw new BadRequestException(
@@ -212,10 +215,11 @@ export class AuthService {
     if (!isStrongPassword(password1)) {
       throw new BadRequestException('Mật khẩu không đủ mạnh');
     }
-    const user = await this.usersService.create({
+    const user = await this.usersService.create(OAuthProvidersEnum.GOOGLE, {
       email,
       name,
       password: password1,
+      provider: OAuthProvidersEnum.LOCAL,
     });
     const confirmationToken = await this.jwtAuthService.generateToken(
       user,
@@ -240,30 +244,6 @@ export class AuthService {
     }
   }
 
-  public async generateAuthTokens(
-    user: User,
-    domain?: string,
-    tokenId?: string,
-  ): Promise<[string, string]> {
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtAuthService.generateToken(
-        user,
-        TokenTypeEnum.ACCESS,
-        domain,
-        tokenId,
-      ),
-      this.jwtAuthService.generateToken(
-        user,
-        TokenTypeEnum.REFRESH,
-        domain,
-        tokenId,
-      ),
-    ]);
-
-    this.logger.debug(`Đã tạo token cho người dùng ${user.email}`);
-    return [accessToken, refreshToken];
-  }
-
   public async refreshTokenAccess({
     refreshToken,
     domain,
@@ -282,11 +262,8 @@ export class AuthService {
       );
     }
 
-    const [accessToken, newRefreshToken] = await this.generateAuthTokens(
-      user,
-      domain,
-      tokenId,
-    );
+    const [accessToken, newRefreshToken] =
+      await this.jwtAuthService.generateAuthTokens(user, domain, tokenId);
 
     this.logger.log(`Đã làm mới token cho người dùng ${user.email}`);
     return { user, accessToken, refreshToken: newRefreshToken };
@@ -386,9 +363,22 @@ export class AuthService {
       },
       userId,
     );
-    const [accessToken, refreshToken] = await this.generateAuthTokens(user);
+    const [accessToken, refreshToken] =
+      await this.jwtAuthService.generateAuthTokens(user);
 
     this.logger.log(`Mật khẩu của người dùng ${userId} đã được thay đổi`);
     return { user, accessToken, refreshToken };
+  }
+
+  async loginByGoogle(user: any) {
+    const [accessToken, refreshToken] =
+      await this.jwtAuthService.generateAuthTokens(user);
+
+    this.logger.log(`Người dùng ${user.email} đăng nhập thành công`);
+    return {
+      code: 200,
+      message: 'Đăng nhập thành công',
+      data: { user: user, accessToken, refreshToken },
+    };
   }
 }

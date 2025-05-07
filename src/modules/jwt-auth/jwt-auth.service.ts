@@ -169,4 +169,17 @@ export class JwtAuthService {
       throw new InternalServerErrorException('Lỗi không xác định: ' + error);
     }
   }
+
+  public async generateAuthTokens(
+    user: User,
+    domain?: string,
+    tokenId?: string,
+  ): Promise<[string, string]> {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.generateToken(user, TokenTypeEnum.ACCESS, domain, tokenId),
+      this.generateToken(user, TokenTypeEnum.REFRESH, domain, tokenId),
+    ]);
+
+    return [accessToken, refreshToken];
+  }
 }

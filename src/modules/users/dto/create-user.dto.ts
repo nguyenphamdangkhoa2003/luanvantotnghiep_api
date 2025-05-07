@@ -1,8 +1,13 @@
 import { NAME_REGEX, SLUG_REGEX } from '@/common/constants/regex.constant';
+import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
 import {
+  IsBoolean,
   IsEmail,
+  IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
+  IsUrl,
   Length,
   Matches,
   MinLength,
@@ -18,7 +23,18 @@ export class CreateUserDto {
   name: string;
 
   @IsString({ message: 'Mật khẩu phải là chuỗi' })
-  @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
-  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
-  password: string;
+  password?: string;
+
+  @IsEnum(OAuthProvidersEnum, {
+    message: 'Không timf thấy provider được cung cấp',
+  })
+  provider: OAuthProvidersEnum;
+
+  @IsBoolean()
+  @IsOptional()
+  public isEmailVerified? = false;
+
+  @IsUrl()
+  @IsOptional()
+  avatar?: string;
 }

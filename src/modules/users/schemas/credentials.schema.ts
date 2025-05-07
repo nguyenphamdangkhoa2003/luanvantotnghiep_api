@@ -16,7 +16,9 @@ export class Credentials {
 
   @Prop({ type: Number, default: () => dayjs().unix() })
   public updatedAt: number;
-
+  constructor(isConfirmed = false) {
+    this.version = isConfirmed ? 1 : 0;
+  }
   public updatePassword(password: string): void {}
 
   public updateVersion(): void {}
@@ -29,6 +31,9 @@ export type CredentialsDocument = HydratedDocument<Credentials>;
 export const CredentialsSchema = SchemaFactory.createForClass(Credentials);
 
 // Định nghĩa các phương thức instance
+
+CredentialsSchema.method.constructor
+
 CredentialsSchema.methods.updatePassword = function (password: string): void {
   this.version++;
   this.lastPassword = password;

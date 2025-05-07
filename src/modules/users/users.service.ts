@@ -15,6 +15,13 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import * as dayjs from 'dayjs';
+import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
+import {
+  OAuthProvider,
+  OAuthProviderDocument,
+} from '@/modules/auth/schemas/oauth-provider.schema';
+import { isNull, isUndefined } from '@/common/utils/validation.util';
+import { Credentials } from '@/modules/users/schemas/credentials.schema';
 
 @Injectable()
 export class UsersService {
@@ -23,13 +30,19 @@ export class UsersService {
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+    @InjectModel(OAuthProvider.name)
+    private readonly oauthProviderModel: Model<OAuthProviderDocument>,
     private readonly commonService: CommonService,
   ) {}
 
   // Tạo người dùng mới
   // Highlights: Tạo người dùng với email, tên và mật khẩu từ DTO
-  async create(dto: CreateUserDto): Promise<UserDocument> {
+  async create(
+    provider: OAuthProvidersEnum,
+    dto: CreateUserDto,
+  ): Promise<UserDocument> {
     const { email, name, password } = dto;
+    const isConfirmed = provider !== OAuthProvidersEnum.LOCAL;
     const formattedEmail = email.toLowerCase();
     const formattedName = this.commonService.formatName(name);
 
@@ -37,26 +50,61 @@ export class UsersService {
 
     this.logger.log(`Tạo người dùng mới với email: ${email}`);
 
-    const hashedPassword = await bcrypt.hash(password, 10);
     const user = new this.userModel({
+      ...dto,
       _id: new Types.ObjectId(),
       email: formattedEmail,
       name: formattedName,
       username: await this.generateUsername(formattedName),
-      password,
-      credentials: {
-        version: 0,
-        password: hashedPassword,
-        lastPassword: '',
-        passwordUpdatedAt: dayjs().unix(),
-        updatedAt: dayjs().unix(),
-      },
-      isEmailVerified: false,
+      password: isUndefined(password)
+        ? 'UNSET'
+        : await bcrypt.hash(password, 10),
+      credentials: new Credentials(isConfirmed),
+      isEmailVerified: isConfirmed,
+      oauthProviders: [],
     });
-
     // Queries: Lưu người dùng
     await this.commonService.saveEntity(this.userModel, user, true);
     this.logger.debug(`Lưu người dùng: ${user.email}`);
+    await this.oauthProviderModel.findOne({ provider, user: user._id }).exec();
+
+    const oauthProvider = await this.createOAuthProvider(
+      provider,
+      user._id.toString(),
+    );
+    // Cập nhật mảng oauthProviders trong User
+    await this.userModel.updateOne(
+      { _id: user._id },
+      { $addToSet: { oauthProviders: oauthProvider._id } },
+    );
+
+    const userRs = await this.userModel
+      .findById(user._id)
+      .populate('oauthProviders');
+    this.commonService.checkEntityExistence(userRs, User.name);
+    return userRs!;
+  }
+
+  public async findOrCreate(data: CreateUserDto): Promise<User> {
+    const formattedEmail = data.email.toLowerCase();
+
+    // Tìm người dùng với email và populate oauthProviders
+    const user = await this.userModel
+      .findOne({ email: formattedEmail })
+      .populate('oauthProviders')
+      .exec();
+    if (!user) {
+      return this.create(data.provider, { ...data });
+    }
+
+    const hasProvider = user.oauthProviders.some(
+      (p: OAuthProvider) => p.provider === data.provider,
+    );
+
+    if (!hasProvider) {
+      await this.createOAuthProvider(data.provider, user._id.toString());
+    }
+
     return user;
   }
 
@@ -118,7 +166,7 @@ export class UsersService {
     // Queries: Tìm người dùng theo username
     const query = this.userModel.findOne({ username: username.toLowerCase() });
     if (!sensitive) {
-      query.select('-credentials.password -credentials.lastPassword');
+      query.select('-credentials.lastPassword');
     }
     const user = await query.exec();
     this.logger.debug(`Tìm người dùng với username: ${username}`);
@@ -196,48 +244,25 @@ export class UsersService {
         this.commonService.generateMessage('ID người dùng không hợp lệ'),
       );
     }
-
+    const user = await this.findOneById(new Types.ObjectId(userId));
+    if (!user) throw new NotFoundException();
     const { oldPassword, newPassword } = dto;
 
-    this.logger.log(`Bắt đầu cập nhật mật khẩu cho người dùng: ${userId}`);
-
-    // Queries: Tìm người dùng với trường password
-    const user = await this.userModel
-      .findById(new Types.ObjectId(userId))
-      .select('+password')
-      .exec();
-    if (!user) {
-      throw new NotFoundException(
-        this.commonService.generateMessage('Người dùng không tồn tại'),
-      );
+    if (user.password === 'UNSET') {
+      await this.createOAuthProvider(OAuthProvidersEnum.LOCAL, user.id);
+    } else {
+      if (isUndefined(oldPassword) || isNull(oldPassword)) {
+        throw new BadRequestException('Mật khẩu là bắt buộc');
+      }
+      if (!(await bcrypt.compare(oldPassword, user.password))) {
+        throw new BadRequestException('Mật khẩu sai');
+      }
+      if (await bcrypt.compare(newPassword, user.password)) {
+        throw new BadRequestException('Mật khẩu mới phải khác');
+      }
     }
 
-    // Alerts: Kiểm tra mật khẩu cũ
-    if (!(await bcrypt.compare(oldPassword, user.password))) {
-      throw new UnauthorizedException(
-        this.commonService.generateMessage('Mật khẩu cũ không đúng'),
-      );
-    }
-
-    // Alerts: Đảm bảo mật khẩu mới khác với hiện tại
-    if (await bcrypt.compare(newPassword, user.password)) {
-      throw new BadRequestException(
-        this.commonService.generateMessage(
-          'Mật khẩu mới phải khác với hiện tại',
-        ),
-      );
-    }
-
-    // Queries: Cập nhật mật khẩu và credentials
-    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-    user.credentials.updatePassword(user.password); // Lưu mật khẩu cũ vào lastPassword
-    user.password = hashedNewPassword;
-
-    // Queries: Lưu thay đổi
-    await this.commonService.saveEntity(this.userModel, user);
-    this.logger.log(`Cập nhật mật khẩu thành công cho người dùng ${userId}`);
-
-    return user;
+    return await this.changePassword(user, newPassword);
   }
 
   // Đặt lại mật khẩu của người dùng
@@ -251,7 +276,6 @@ export class UsersService {
         this.commonService.generateMessage('ID người dùng không hợp lệ'),
       );
     }
-
     // Queries: Tìm người dùng với ID và version
     const user = await this.findOneByCredentials(userId, version);
     if (!user) {
@@ -267,7 +291,7 @@ export class UsersService {
     user.password = password;
 
     // Queries: Lưu thay đổi
-    await this.commonService.saveEntity(this.userModel, user);
+    await this.changePassword(user, password);
     this.logger.log(`Đặt lại mật khẩu thành công cho người dùng ${userId}`);
 
     return user;
@@ -301,5 +325,45 @@ export class UsersService {
     this.logger.log(
       `Cập nhật trạng thái xác nhận email cho người dùng ${id}: ${isVerified}`,
     );
+  }
+
+  private async createOAuthProvider(
+    provider: OAuthProvidersEnum,
+    userId: string,
+  ): Promise<OAuthProviderDocument> {
+    const oauthProvider = await this.oauthProviderModel.create({
+      provider,
+      user: userId,
+    });
+    await this.commonService.saveEntity(
+      this.oauthProviderModel,
+      oauthProvider,
+      true,
+    );
+    return oauthProvider;
+  }
+
+  private async changePassword(
+    user: UserDocument,
+    password: string,
+  ): Promise<UserDocument> {
+    user.credentials.updatePassword(user.password);
+    user.password = await bcrypt.hash(password, 10);
+    await this.commonService.saveEntity(this.userModel, user);
+    return user;
+  }
+
+  public async findOneById(id: Types.ObjectId): Promise<UserDocument | null> {
+    const user = await this.userModel.findOne({ id }).select('+password');
+    this.commonService.checkEntityExistence(user, User.name);
+    return user;
+  }
+
+  public async findOAuthProviders(
+    userId: number,
+  ): Promise<OAuthProviderDocument[]> {
+    return await this.oauthProviderModel
+      .find({ user: userId })
+      .sort({ provider: 1 });
   }
 }

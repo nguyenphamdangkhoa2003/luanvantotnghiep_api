@@ -25,6 +25,9 @@ import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto';
 import { EmailDto } from '@/modules/auth/dto/email.dto';
 import { ResetPasswordDto } from '@/modules/auth/dto/reset-password.dto';
 import { ChangePasswordDto } from '@/modules/auth/dto/change-password.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { JwtAuthGuard } from './guard/jwt-auth.guard';
+import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
 
 @Controller('auth')
 export class AuthController {
@@ -32,7 +35,10 @@ export class AuthController {
     timestamp: true,
   });
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly jwtAuthService: JwtAuthService,
+  ) {}
 
   @Public()
   @UseGuards(LocalAuthGuard)
@@ -45,7 +51,7 @@ export class AuthController {
     }
 
     const [accessToken, refreshToken] =
-      await this.authService.generateAuthTokens(req.user);
+      await this.jwtAuthService.generateAuthTokens(req.user);
 
     this.logger.log(`Người dùng ${req.user.email} đăng nhập thành công`);
     return {
@@ -53,6 +59,18 @@ export class AuthController {
       message: 'Đăng nhập thành công',
       data: { user: req.user, accessToken, refreshToken },
     };
+  }
+  @Public()
+  @UseGuards(AuthGuard('google'))
+  @Get('google')
+  async googleLogin() {}
+
+  @Public()
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(@Req() req) {
+    const user = req.user;
+    return this.authService.loginByGoogle(user);
   }
 
   @Public()

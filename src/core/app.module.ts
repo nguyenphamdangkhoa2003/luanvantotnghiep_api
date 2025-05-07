@@ -9,6 +9,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailModule } from '@/modules/mail/mail.module';
 import { CommonModule } from '@/modules/common/common.module';
 import { CacheModule } from '@nestjs/cache-manager';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerConfig } from '@/config/throttler.config';
 
 const dbLogger = new Logger('Database');
 
@@ -21,6 +23,10 @@ const logDatabaseConnection = () => {
 
 @Module({
   imports: [
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      useClass: ThrottlerConfig,
+    }),
     MailModule,
     CommonModule,
     ConfigModule.forRoot({

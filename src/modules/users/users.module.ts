@@ -3,10 +3,18 @@ import { UsersService } from './users.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from '@/modules/users/schemas/user.schema';
 import { CommonService } from '@/modules/common/common.service';
+import { OAuthProvider } from '@/modules/auth/schemas/oauth-provider.schema';
+import { OAuthProviderSchema } from '../auth/schemas/oauth-provider.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      {
+        name: OAuthProvider.name,
+        schema: OAuthProviderSchema,
+      },
+    ]),
   ],
   providers: [UsersService, CommonService],
   exports: [UsersService],
