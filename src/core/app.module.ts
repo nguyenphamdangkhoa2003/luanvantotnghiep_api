@@ -14,6 +14,7 @@ import { ThrottlerConfig } from '@/config/throttler.config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from '@/modules/auth/guard/jwt-auth.guard';
 import { JwtAuthModule } from '@/modules/jwt-auth/jwt-auth.module';
+import { UsersModule } from '@/modules/users/users.module';
 
 const dbLogger = new Logger('Database');
 
@@ -26,6 +27,7 @@ const logDatabaseConnection = () => {
 
 @Module({
   imports: [
+    UsersModule,
     JwtAuthModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],

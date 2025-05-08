@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -12,12 +13,17 @@ import { IS_PUBLIC_KEY } from '@/modules/auth/decorators/public.decorators';
 import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
 import { TokenTypeEnum } from '@/modules/jwt-auth/enums/types';
 import { IAccessToken } from '@/modules/jwt-auth/interfaces/access-token.interface';
+import { AuthService } from '@/modules/auth/auth.service';
+import { UsersService } from '@/modules/users/users.service';
+import { Types } from 'mongoose';
+import { AuthRequest } from '@/types';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private jwtAuthService: JwtAuthService,
     private configService: ConfigService,
+    private userSerivce: UsersService,
     private reflector: Reflector, // Inject Reflector để kiểm tra metadata
   ) {}
 
@@ -32,7 +38,7 @@ export class JwtAuthGuard implements CanActivate {
       return true; // Bỏ qua xác thực nếu route là public
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<AuthRequest>();
     const token = this.extractTokenFromHeader(request);
     if (!token) {
       throw new UnauthorizedException(
@@ -45,7 +51,13 @@ export class JwtAuthGuard implements CanActivate {
         token,
         TokenTypeEnum.ACCESS,
       );
-      request.user = payload;
+      const user = await this.userSerivce.findOneById(
+        new Types.ObjectId(payload.id),
+      );
+      if (!user) {
+        throw new NotFoundException();
+      }
+      request.user = user;
     } catch (e) {
       Logger.error(e.message);
       throw new UnauthorizedException(e.message);

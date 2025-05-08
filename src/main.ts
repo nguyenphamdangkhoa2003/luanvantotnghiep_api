@@ -5,6 +5,7 @@ import * as session from 'express-session';
 import { ConfigService } from '@nestjs/config';
 import { CipherKey } from 'crypto';
 import * as passport from 'passport';
+import helmet from 'helmet';
 
 const APP_NAME = 'XeShare API';
 const logger = new Logger(APP_NAME, { timestamp: true });
@@ -21,6 +22,7 @@ async function bootstrap() {
       origin: 'http://localhost:3001', 
       credentials: true,
     });
+    app.use(helmet());
     const configService = app.get(ConfigService);
     const sessionOptions: session.SessionOptions = {
       secret: configService.get<string>('session.secret') as CipherKey,

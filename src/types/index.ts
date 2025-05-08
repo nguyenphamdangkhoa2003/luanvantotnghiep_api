@@ -1,4 +1,4 @@
-import { User } from '@/modules/users/schemas/user.schema';
+import {  UserDocument } from '@/modules/users/schemas/user.schema';
 import { Request } from 'express';
 
 export interface ApiResponse<T = unknown> {
@@ -7,7 +7,7 @@ export interface ApiResponse<T = unknown> {
   data?: T;
 }
 export interface AuthRequest extends Request {
-  user: User;
+  user: UserDocument;
 }
 
 export interface IMessage {

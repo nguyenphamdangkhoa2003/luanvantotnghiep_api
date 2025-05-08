@@ -49,7 +49,7 @@ export class MailService {
 
   public async sendResetPasswordEmail(user: User, token: string) {
     const { email, name } = user;
-    const link = `http://${this.domain}/auth/reset-password/${token}`;
+    const link = `http://${this.domain}/auth/reset-password?code=${token}`;
     try {
       await this.mailerService.sendMail({
         to: email,

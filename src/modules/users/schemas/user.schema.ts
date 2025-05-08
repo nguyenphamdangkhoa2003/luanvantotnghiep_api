@@ -63,11 +63,6 @@ export class User {
   @Matches(BCRYPT_HASH_OR_UNSET)
   public password: string;
 
-  @Prop({ type: String })
-  @IsOptional()
-  @IsString()
-  public googleId: string;
-
   @Prop({ enum: UserRole, default: UserRole.CUSTOMER, type: String })
   @IsEnum(UserRole, { message: 'Invalid role' })
   public role: UserRole;
