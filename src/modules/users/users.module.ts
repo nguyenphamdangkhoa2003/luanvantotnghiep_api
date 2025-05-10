@@ -7,6 +7,7 @@ import { OAuthProvider } from '@/modules/auth/schemas/oauth-provider.schema';
 import { OAuthProviderSchema } from '../auth/schemas/oauth-provider.schema';
 import { UsersController } from './users.controller';
 import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
+import { CloudinaryService } from '@/common/services/cloudinary.service';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
       },
     ]),
   ],
-  providers: [UsersService, CommonService, JwtAuthService],
+  providers: [UsersService, CommonService, JwtAuthService, CloudinaryService],
   exports: [UsersService],
   controllers: [UsersController],
 })

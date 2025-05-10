@@ -96,6 +96,18 @@ class ConfigSchema {
   @IsString()
   @IsNotEmpty({ message: 'Không tìm thấy domain' })
   DOMAIN: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Không tìm thấy cloudinary name' })
+  CLOUDINARY_CLOUD_NAME: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Không tìm thấy cloudinary api key' })
+  CLOUDINARY_API_KEY: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Không tìm thấy cloudinary api secret' })
+  CLOUDINARY_API_SECRET: string;
 }
 
 export const configModuleOptions: ConfigModuleOptions = {
@@ -182,6 +194,9 @@ export default (): IAppConfig => {
     EMAIL_SECURE: process.env.EMAIL_SECURE === 'true',
     EMAIL_USER: process.env.EMAIL_USER,
     EMAIL_PASSWORD: process.env.EMAIL_PASSWORD,
+    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
   });
 
   return {
@@ -229,6 +244,11 @@ export default (): IAppConfig => {
       clientId: env.GOOGLE_CLIENT_ID,
       clientSecret: env.GOOGLE_SECRET,
       callbackUrl: env.GOOGLE_CALLBACK_URL,
+    },
+    cloudinary: {
+      api_key: env.CLOUDINARY_API_KEY,
+      name: env.CLOUDINARY_CLOUD_NAME,
+      api_secret: env.CLOUDINARY_API_SECRET,
     },
   };
 };

@@ -5,17 +5,23 @@ import { UpdateUserDto } from '@/modules/users/dto/update-user.dto';
 import { UsersService } from '@/modules/users/users.service';
 import { AuthRequest } from '@/types';
 import {
+  BadRequestException,
   Body,
   Controller,
   HttpCode,
   HttpException,
   HttpStatus,
   Patch,
+  Post,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { UserRole } from './schemas/user.schema';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UploadDocumentDto } from '@/modules/users/dto/upload-document.dto';
 
 @Controller('users')
 export class UsersController {
@@ -51,5 +57,33 @@ export class UsersController {
       );
     }
     return this.usersService.updateRole(userId, updateRoleDto);
+  }
+
+  @Post("me/documents")
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDocument(
+    @Req() req: AuthRequest,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() uploadDocumentDto: UploadDocumentDto,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    const userId = req.user._id;
+    const { type, documentNumber } = uploadDocumentDto;
+
+    const result = await this.usersService.uploadDocument(
+      userId,
+      file,
+      type,
+      documentNumber,
+    );
+
+    return {
+      message: 'Document uploaded successfully, pending verification',
+      data: result,
+    };
   }
 }

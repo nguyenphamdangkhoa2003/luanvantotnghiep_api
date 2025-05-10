@@ -27,6 +27,7 @@ import { Credentials } from '@/modules/users/schemas/credentials.schema';
 import { UpdateUserDto } from '@/modules/users/dto/update-user.dto';
 import { UpdateRoleDto } from '@/modules/users/dto/update-role.dto';
 import { VerificationStatus } from '@/common/enums/verification-status.enum';
+import { CloudinaryService } from '@/common/services/cloudinary.service';
 
 @Injectable()
 export class UsersService {
@@ -38,6 +39,7 @@ export class UsersService {
     @InjectModel(OAuthProvider.name)
     private readonly oauthProviderModel: Model<OAuthProviderDocument>,
     private readonly commonService: CommonService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   // Tạo người dùng mới
@@ -453,5 +455,64 @@ export class UsersService {
 
     await user.save();
     return user;
+  }
+
+  async uploadDocument(
+    userId: Types.ObjectId,
+    file: Express.Multer.File,
+    type: 'driverLicense' | 'identityDocument',
+    documentNumber: string,
+  ) {
+    // Kiểm tra loại tài liệu hợp lệ
+    if (!['driverLicense', 'identityDocument'].includes(type)) {
+      throw new BadRequestException('Invalid document type');
+    }
+
+    // Kiểm tra định dạng file
+    const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException('Only JPEG, PNG, or PDF files are allowed');
+    }
+
+    // Tải file lên Cloudinary
+    const uploadResult = await this.cloudinaryService.uploadFile(file, {
+      folder: `car-sharing/documents/${type}/${userId}`,
+      resource_type: 'auto',
+    });
+
+    // Cập nhật schema User
+    const updateData: any = {};
+    if (type === 'driverLicense') {
+      updateData.driverLicense = {
+        licenseNumber: documentNumber,
+        licenseImage: uploadResult.secure_url,
+        verificationStatus: VerificationStatus.PENDING,
+      };
+    } else {
+      updateData.identityDocument = {
+        documentNumber,
+        documentImage: uploadResult.secure_url,
+        verificationStatus: VerificationStatus.PENDING,
+      };
+    }
+
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $set: updateData },
+        { new: true, runValidators: true },
+      )
+      .select('driverLicense identityDocument');
+
+    if (!updatedUser) {
+      throw new BadRequestException('User not found');
+    }
+
+    return {
+      type,
+      documentNumber,
+      documentImage: uploadResult.secure_url,
+      verificationStatus: VerificationStatus.PENDING,
+    };
   }
 }
