@@ -13,10 +13,10 @@ import { IS_PUBLIC_KEY } from '@/modules/auth/decorators/public.decorators';
 import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
 import { TokenTypeEnum } from '@/modules/jwt-auth/enums/types';
 import { IAccessToken } from '@/modules/jwt-auth/interfaces/access-token.interface';
-import { AuthService } from '@/modules/auth/auth.service';
 import { UsersService } from '@/modules/users/users.service';
 import { Types } from 'mongoose';
 import { AuthRequest } from '@/types';
+import { getCookies } from '@/common/utils/cookie.utils';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -24,7 +24,7 @@ export class JwtAuthGuard implements CanActivate {
     private jwtAuthService: JwtAuthService,
     private configService: ConfigService,
     private userSerivce: UsersService,
-    private reflector: Reflector, // Inject Reflector để kiểm tra metadata
+    private reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -39,13 +39,12 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<AuthRequest>();
-    const token = this.extractTokenFromHeader(request);
-    if (!token) {
+    const token = getCookies(request, TokenTypeEnum.ACCESS);
+    if (!token || typeof token !== 'string') {
       throw new UnauthorizedException(
-        'Không tìm thấy access token trong header',
+        'Không tìm thấy access token trong cookie',
       );
     }
-
     try {
       const payload = await this.jwtAuthService.verifyToken<IAccessToken>(
         token,
@@ -64,10 +63,5 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     return true;
-  }
-
-  private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
   }
 }

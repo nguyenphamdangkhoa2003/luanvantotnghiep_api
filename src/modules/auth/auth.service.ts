@@ -35,6 +35,7 @@ import { CommonService } from '@/modules/common/common.service';
 import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
 import { OAuthProvider } from './schemas/oauth-provider.schema';
 import { SignInByGoogleDto } from './dto/sign-in-by-google.dto';
+import { setCookies } from '@/common/utils/cookie.utils';
 
 @Injectable()
 export class AuthService {
@@ -247,7 +248,7 @@ export class AuthService {
   public async refreshTokenAccess({
     refreshToken,
     domain,
-  }: RefreshTokenDto): Promise<IAuthResult> {
+  }: RefreshTokenDto): Promise<any> {
     const { id, version, tokenId } =
       await this.jwtAuthService.verifyToken<IRefreshToken>(
         refreshToken,
@@ -264,9 +265,8 @@ export class AuthService {
 
     const [accessToken, newRefreshToken] =
       await this.jwtAuthService.generateAuthTokens(user, domain, tokenId);
-
     this.logger.log(`Đã làm mới token cho người dùng ${user.email}`);
-    return { user, accessToken, refreshToken: newRefreshToken };
+    return [accessToken, newRefreshToken];
   }
 
   public async checkIfTokenIsBlacklisted(
@@ -352,7 +352,7 @@ export class AuthService {
   public async changePassword(
     userId: string,
     dto: ChangePasswordDto,
-  ): Promise<IAuthResult> {
+  ): Promise<[string, string]> {
     const { password1, password2, password } = dto;
     this.comparePasswords(password1, password2);
 
@@ -367,7 +367,7 @@ export class AuthService {
       await this.jwtAuthService.generateAuthTokens(user);
 
     this.logger.log(`Mật khẩu của người dùng ${userId} đã được thay đổi`);
-    return { user, accessToken, refreshToken };
+    return [accessToken, refreshToken];
   }
 
   async loginByGoogle(user: any) {
@@ -375,10 +375,6 @@ export class AuthService {
       await this.jwtAuthService.generateAuthTokens(user);
 
     this.logger.log(`Người dùng ${user.email} đăng nhập thành công`);
-    return {
-      code: 200,
-      message: 'Đăng nhập thành công',
-      data: { user: user, accessToken, refreshToken },
-    };
+    return [accessToken, refreshToken];
   }
 }
