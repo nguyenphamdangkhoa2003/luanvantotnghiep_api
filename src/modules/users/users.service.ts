@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
@@ -8,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { User, UserDocument } from './schemas/user.schema';
+import { User, UserDocument, UserRole } from './schemas/user.schema';
 import * as bcrypt from 'bcrypt';
 import { CommonService } from '@/modules/common/common.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -23,6 +25,8 @@ import {
 import { isNull, isUndefined } from '@/common/utils/validation.util';
 import { Credentials } from '@/modules/users/schemas/credentials.schema';
 import { UpdateUserDto } from '@/modules/users/dto/update-user.dto';
+import { UpdateRoleDto } from '@/modules/users/dto/update-role.dto';
+import { VerificationStatus } from '@/common/enums/verification-status.enum';
 
 @Injectable()
 export class UsersService {
@@ -419,5 +423,35 @@ export class UsersService {
     }
 
     return updatedUser;
+  }
+
+  async updateRole(
+    userId: Types.ObjectId,
+    updateRoleDto: UpdateRoleDto,
+  ): Promise<User> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    // Kiểm tra nếu chuyển sang DRIVER
+    if (updateRoleDto.role === UserRole.DRIVER) {
+      if (
+        !user.driverLicense ||
+        user.driverLicense.verificationStatus !== VerificationStatus.APPROVED
+      ) {
+        throw new HttpException(
+          'A verified driver license is required to become a driver',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+
+    // Cập nhật vai trò
+    user.role = updateRoleDto.role;
+    user.updatedAt = new Date();
+
+    await user.save();
+    return user;
   }
 }
