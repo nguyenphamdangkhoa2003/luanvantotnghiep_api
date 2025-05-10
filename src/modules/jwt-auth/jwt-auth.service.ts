@@ -170,7 +170,7 @@ export class JwtAuthService {
         tokenTypeName.charAt(0).toUpperCase() + tokenTypeName.slice(1);
 
       if (error instanceof TokenExpiredError) {
-        throw new BadRequestException(`${capitalizedTokenType} đã hết hạn`);
+        throw new BadRequestException(error);
       }
       if (error instanceof JsonWebTokenError) {
         throw new BadRequestException(`${capitalizedTokenType} không hợp lệ`);

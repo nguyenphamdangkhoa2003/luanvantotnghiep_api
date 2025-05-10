@@ -1,27 +1,35 @@
-import { NAME_REGEX, SLUG_REGEX } from '@/common/constants/regex.constant';
-import { isNull, isUndefined } from '@/common/utils/validation.util';
-import { IsString, Length, Matches, ValidateIf } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+  IsPhoneNumber,
+  IsDateString,
+  IsUrl,
+} from 'class-validator';
+import { NAME_REGEX } from '@/common/constants/regex.constant';
 
-export abstract class UpdateUserDto {
-  @IsString()
-  @Length(3, 106)
-  @Matches(SLUG_REGEX, {
-    message: 'Username must be a valid slugs',
-  })
-  @ValidateIf(
-    (o: UpdateUserDto) =>
-      !isUndefined(o.username) || isUndefined(o.name) || isNull(o.name),
-  )
-  public username?: string;
-
+export class UpdateUserDto {
+  @IsOptional()
   @IsString()
   @Length(3, 100)
-  @Matches(NAME_REGEX, {
-    message: 'Name must not have special characters',
-  })
-  @ValidateIf(
-    (o: UpdateUserDto) =>
-      !isUndefined(o.name) || isUndefined(o.username) || isNull(o.username),
-  )
-  public name?: string;
+  @Matches(NAME_REGEX, { message: 'Name must not have special characters' })
+  name?: string;
+
+  @IsOptional()
+  @IsPhoneNumber(undefined, { message: 'Invalid phone number' })
+  phoneNumber?: string;
+
+  @IsOptional()
+  @IsDateString({}, { message: 'Invalid date of birth' })
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsUrl({}, { message: 'Invalid avatar URL' })
+  avatar?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 500, { message: 'Bio must be less than 500 characters' })
+  bio?: string;
 }

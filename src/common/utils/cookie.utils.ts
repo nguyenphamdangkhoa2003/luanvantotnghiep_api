@@ -1,7 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { CookieOptions, Request, Response } from 'express';
 
-
 interface CookieResult {
   [key: string]: string | undefined;
 }
@@ -26,7 +25,6 @@ export function setCookies(res: Response, cookies: ICookieData[]): void {
       path: '/',
       ...options,
     };
-
     res.cookie(name, value, defaultOptions);
   });
 }

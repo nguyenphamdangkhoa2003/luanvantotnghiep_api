@@ -216,7 +216,7 @@ export class AuthService {
     if (!isStrongPassword(password1)) {
       throw new BadRequestException('Mật khẩu không đủ mạnh');
     }
-    const user = await this.usersService.create(OAuthProvidersEnum.GOOGLE, {
+    const user = await this.usersService.create(OAuthProvidersEnum.LOCAL, {
       email,
       name,
       password: password1,

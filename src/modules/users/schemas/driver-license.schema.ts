@@ -10,7 +10,7 @@ export class DriverLicense {
 
   @Prop({ type: String, required: true })
   @IsUrl()
-  licenseImage: string; // URL tới ảnh giấy phép (lưu trên S3 hoặc tương tự)
+  licenseImage: string; 
 
   @Prop({
     type: String,

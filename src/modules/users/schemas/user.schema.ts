@@ -3,11 +3,14 @@ import { HydratedDocument, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
 import {
+  IsArray,
   IsBoolean,
   IsDate,
+  IsDateString,
   IsEmail,
   IsEnum,
   IsOptional,
+  IsPhoneNumber,
   IsString,
   IsUrl,
   Length,
@@ -23,6 +26,10 @@ import {
   CredentialsSchema,
 } from '@/modules/users/schemas/credentials.schema';
 import { OAuthProvider } from '@/modules/auth/schemas/oauth-provider.schema';
+import { VerificationStatus } from '@/common/enums/verification-status.enum';
+import { DriverLicense } from '@/modules/users/schemas/driver-license.schema';
+import { Vehicle } from '@/modules/users/schemas/vehicle.schema';
+import { PaymentMethod } from '@/modules/users/schemas/payment-method.schema';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -89,6 +96,55 @@ export class User {
   @IsUrl()
   @IsOptional()
   avatar: string;
+
+  // ============================= MODULE PROFILE ============================= 
+
+  @Prop({ type: String, required: false })
+  @IsOptional()
+  @IsPhoneNumber()
+  phoneNumber?: string;
+
+  @Prop({ type: String, required: false })
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: string;
+
+  @Prop({ type: Object, required: false })
+  @IsOptional()
+  identityDocument?: {
+    documentNumber: string;
+    documentImage: string; 
+    verificationStatus: VerificationStatus;
+    verifiedAt?: Date;
+  };
+
+  @Prop({ type: DriverLicense, required: false })
+  @IsOptional()
+  driverLicense?: DriverLicense;
+
+  @Prop({ type: [Vehicle], required: false })
+  @IsOptional()
+  @IsArray()
+  vehicles?: Vehicle[];
+
+  // NEW: Tuyến đường cố định (cho tài xế)
+  // @Prop({ type: [Route], required: false })
+  // @IsOptional()
+  // @IsArray()
+  // routes?: Route[];
+
+  // NEW: Phương thức thanh toán
+  @Prop({ type: [PaymentMethod], required: false })
+  @IsOptional()
+  @IsArray()
+  paymentMethods?: PaymentMethod[];
+
+  // NEW: Mô tả hồ sơ công khai (tùy chọn)
+  @Prop({ type: String, required: false })
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  bio?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

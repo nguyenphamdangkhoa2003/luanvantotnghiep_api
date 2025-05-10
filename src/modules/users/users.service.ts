@@ -22,6 +22,7 @@ import {
 } from '@/modules/auth/schemas/oauth-provider.schema';
 import { isNull, isUndefined } from '@/common/utils/validation.util';
 import { Credentials } from '@/modules/users/schemas/credentials.schema';
+import { UpdateUserDto } from '@/modules/users/dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -89,7 +90,7 @@ export class UsersService {
     const formattedEmail = data.email.toLowerCase();
 
     // Tìm người dùng với email và populate oauthProviders
-    const user = await this.userModel
+    let user = await this.userModel
       .findOne({ email: formattedEmail })
       .populate('oauthProviders')
       .exec();
@@ -102,10 +103,31 @@ export class UsersService {
     );
 
     if (!hasProvider) {
+      // Thêm provider mới nếu chưa có
       await this.createOAuthProvider(data.provider, user._id.toString());
+      // Refresh user để cập nhật oauthProviders
+      user = await this.userModel
+        .findOne({ email: formattedEmail })
+        .populate('oauthProviders')
+        .exec();
     }
 
-    return user;
+    const updatedData: Partial<User> = {
+      ...data,
+      updatedAt: new Date(), // Cập nhật thời gian sửa đổi
+    };
+
+    // Cập nhật người dùng trong database
+    user = await this.userModel
+      .findOneAndUpdate(
+        { email: formattedEmail },
+        { $set: updatedData },
+        { new: true, runValidators: true }, // Trả về document mới và chạy validator
+      )
+      .populate('oauthProviders')
+      .exec();
+    await this.commonService.checkEntityExistence(user, User.name);
+    return user!;
   }
 
   private async generateUsername(name: string): Promise<string> {
@@ -355,7 +377,7 @@ export class UsersService {
 
   public async findOneById(id: Types.ObjectId): Promise<UserDocument | null> {
     const user = await this.userModel.findById(id).select('+password');
-    this.commonService.checkEntityExistence(user, User.name);
+    await this.commonService.checkEntityExistence(user, User.name);
     return user;
   }
 
@@ -365,5 +387,37 @@ export class UsersService {
     return await this.oauthProviderModel
       .find({ user: userId })
       .sort({ provider: 1 });
+  }
+
+  async updateProfile(
+    userId: Types.ObjectId,
+    updateUserDto: UpdateUserDto,
+  ): Promise<User> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const updateData: Partial<User> = {};
+    if (updateUserDto.name) updateData.name = updateUserDto.name;
+    if (updateUserDto.phoneNumber)
+      updateData.phoneNumber = updateUserDto.phoneNumber;
+    if (updateUserDto.dateOfBirth)
+      updateData.dateOfBirth = updateUserDto.dateOfBirth;
+    if (updateUserDto.avatar) updateData.avatar = updateUserDto.avatar;
+    if (updateUserDto.bio) updateData.bio = updateUserDto.bio;
+
+    updateData.updatedAt = new Date();
+
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(userId, { $set: updateData }, { new: true })
+      .select('-password -credentials -oauthProviders')
+      .exec();
+
+    if (!updatedUser) {
+      throw new BadRequestException('Failed to update profile');
+    }
+
+    return updatedUser;
   }
 }

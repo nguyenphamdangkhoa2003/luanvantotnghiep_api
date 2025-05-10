@@ -45,10 +45,7 @@ export class AuthController {
   @Public()
   @UseGuards(LocalAuthGuard)
   @Post('signin')
-  async signIn(
-    @Req() req: AuthRequest,
-    @Res() res: Response,
-  ): Promise<ApiResponse<IAuthResult>> {
+  async signIn(@Req() req: AuthRequest, @Res() res: Response) {
     if (!req.user || !req.user.email || !req.user._id) {
       throw new UnauthorizedException(
         this.authService.generateMessage('Người dùng chưa được xác thực'),
@@ -57,30 +54,30 @@ export class AuthController {
 
     const [accessToken, refreshToken] =
       await this.jwtAuthService.generateAuthTokens(req.user);
-
     setCookies(res, [
       {
         name: TokenTypeEnum.ACCESS,
         value: accessToken,
         options: {
-          maxAge: Number(this.configService.get<string>('jwt.access.time')),
+          maxAge:
+            Number(this.configService.get<string>('jwt.access.time')) * 1000,
         },
       },
       {
         name: TokenTypeEnum.REFRESH,
         value: refreshToken,
         options: {
-          maxAge: Number(this.configService.get<string>('jwt.refresh.time')),
+          maxAge:
+            Number(this.configService.get<string>('jwt.refresh.time')) * 1000,
         },
       },
     ]);
-
     this.logger.log(`Người dùng ${req.user.email} đăng nhập thành công`);
-    return {
+    return res.status(HttpStatus.OK).json({
       code: HttpStatus.OK,
       message: 'Đăng nhập thành công',
       data: { user: req.user },
-    };
+    });
   }
 
   @Public()
@@ -99,12 +96,18 @@ export class AuthController {
       {
         name: TokenTypeEnum.ACCESS,
         value: accessToken,
-        options: { maxAge: Number(this.configService.get<string>('jwt.access.time')) }, // 1 giờ
+        options: {
+          maxAge:
+            Number(this.configService.get<string>('jwt.access.time')) * 1000,
+        }, // 1 giờ
       },
       {
         name: TokenTypeEnum.REFRESH,
         value: refreshToken,
-        options: { maxAge: Number(this.configService.get<string>('jwt.refresh.time'))}, // 7 ngày
+        options: {
+          maxAge:
+            Number(this.configService.get<string>('jwt.refresh.time')) * 1000,
+        }, // 7 ngày
       },
     ]);
     return res.redirect('http://localhost:3001/?login=success');
@@ -163,40 +166,40 @@ export class AuthController {
     return response;
   }
 
+  @Public()
   @Post('refresh-token')
-  async refreshToken(
-    @Body('refreshToken') refreshToken: string,@Res() res: Response
-  ): Promise<ApiResponse<IAuthResult>> {
-    if (!refreshToken) {
-      throw new BadRequestException(
-        this.authService.generateMessage('Refresh token không được cung cấp'),
-      );
-    }
-
-    const [accessToken, newRefreshToken] = await this.authService.refreshTokenAccess({
-      refreshToken: refreshToken,
-    });
+  async refreshToken(@Res() res: Response, @Req() req: Request) {
+    const refreshToken = getCookies(req, TokenTypeEnum.REFRESH);
+    if (typeof refreshToken !== 'string')
+      throw new InternalServerErrorException();
+    const [accessToken, newRefreshToken] =
+      await this.authService.refreshTokenAccess({
+        refreshToken: refreshToken,
+      });
 
     setCookies(res, [
       {
         name: TokenTypeEnum.ACCESS,
         value: accessToken,
-        options: { maxAge: Number(this.configService.get<string>('jwt.access.time')) }, // 1 giờ
+        options: {
+          maxAge:
+            Number(this.configService.get<string>('jwt.access.time')) * 1000,
+        },
       },
       {
         name: TokenTypeEnum.REFRESH,
         value: newRefreshToken,
-        options: { maxAge: Number(this.configService.get<string>('jwt.refresh.time'))}, // 7 ngày
+        options: {
+          maxAge:
+            Number(this.configService.get<string>('jwt.refresh.time')) * 1000,
+        },
       },
     ]);
 
-    this.logger.log(
-      `Làm mới token thành công cho người dùng`,
-    );
-    return {
-      code: HttpStatus.OK,
+    this.logger.log(`Làm mới token thành công cho người dùng`);
+    return res.status(HttpStatus.OK).json({
       message: 'Làm mới token thành công',
-    };
+    });
   }
 
   @Public()
@@ -233,8 +236,8 @@ export class AuthController {
   async changePassword(
     @Body() data: ChangePasswordDto,
     @Req() req: AuthRequest,
-    @Res() res: Response
-  ): Promise<ApiResponse<IAuthResult>> {
+    @Res() res: Response,
+  ) {
     if (!req.user || !req.user._id) {
       throw new UnauthorizedException(
         this.authService.generateMessage('Người dùng chưa được xác thực'),
@@ -249,7 +252,7 @@ export class AuthController {
       );
     }
 
-    const  [accessToken, refreshToken]= await this.authService.changePassword(
+    const [accessToken, refreshToken] = await this.authService.changePassword(
       req.user._id.toString(),
       data,
     );
@@ -257,20 +260,26 @@ export class AuthController {
       {
         name: TokenTypeEnum.ACCESS,
         value: accessToken,
-        options: { maxAge: Number(this.configService.get<string>('jwt.access.time')) }, // 1 giờ
+        options: {
+          maxAge:
+            Number(this.configService.get<string>('jwt.access.time')) * 1000,
+        }, // 1 giờ
       },
       {
         name: TokenTypeEnum.REFRESH,
         value: refreshToken,
-        options: { maxAge: Number(this.configService.get<string>('jwt.refresh.time'))}, // 7 ngày
+        options: {
+          maxAge:
+            Number(this.configService.get<string>('jwt.refresh.time')) * 1000,
+        }, // 7 ngày
       },
     ]);
     this.logger.log(
       `Thay đổi mật khẩu thành công cho người dùng ${req.user.email}`,
     );
-    return {
+    return res.status(HttpStatus.OK).json({
       code: HttpStatus.OK,
       message: 'Thay đổi mật khẩu thành công',
-    };
+    });
   }
 }

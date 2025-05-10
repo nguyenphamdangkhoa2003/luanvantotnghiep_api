@@ -5,6 +5,8 @@ import { User, UserSchema } from '@/modules/users/schemas/user.schema';
 import { CommonService } from '@/modules/common/common.service';
 import { OAuthProvider } from '@/modules/auth/schemas/oauth-provider.schema';
 import { OAuthProviderSchema } from '../auth/schemas/oauth-provider.schema';
+import { UsersController } from './users.controller';
+import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
 
 @Module({
   imports: [
@@ -16,7 +18,8 @@ import { OAuthProviderSchema } from '../auth/schemas/oauth-provider.schema';
       },
     ]),
   ],
-  providers: [UsersService, CommonService],
+  providers: [UsersService, CommonService, JwtAuthService],
   exports: [UsersService],
+  controllers: [UsersController],
 })
 export class UsersModule {}
