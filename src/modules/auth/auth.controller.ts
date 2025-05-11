@@ -29,6 +29,9 @@ import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
 import { getCookies, setCookies } from '@/common/utils/cookie.utils';
 import { ConfigService } from '@nestjs/config';
 import { TokenTypeEnum } from '@/modules/jwt-auth/enums/types';
+import { RolesGuard } from '@/modules/auth/guard/role.guard';
+import { UserRole } from '@/modules/users/schemas/user.schema';
+import { Roles } from '@/modules/auth/decorators/roles.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -122,6 +125,8 @@ export class AuthController {
   }
 
   @Get('profile')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
   getProfile(@Req() request: Request) {
     if (!request.user) {
       throw new UnauthorizedException(

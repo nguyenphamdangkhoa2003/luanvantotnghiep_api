@@ -2,7 +2,7 @@
   <head>
     <meta charset='UTF-8' />
     <meta name='viewport' content='width=device-width, initial-scale=1.0' />
-    <title>Email Confirmation</title>
+    <title>Document Verification Approved</title>
   </head>
   <body
     style='margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #F3F4F6;'
@@ -36,26 +36,29 @@
               <td style='padding: 40px 24px; text-align: center;'>
                 <h2
                   style='font-size: 22px; color: #1F2937; margin: 0 0 16px;'
-                >Welcome, {{name}}!</h2>
+                >Document Approved, {{name}}!</h2>
                 <p
                   style='font-size: 16px; color: #4B5563; margin: 0 0 24px; line-height: 1.5;'
                 >
-                  Thank you for signing up with
-                  {{app}}! We're excited to have you on board. Please verify
-                  your email address ({{email}}) to get started.
+                  Congratulations! Your
+                  {{documentType}}
+                  for your
+                  {{app}}
+                  account ({{email}}) has been successfully verified. You can
+                  now proceed with full access to our services.
                 </p>
                 <!-- Icon -->
                 <img
                   src='https://res.cloudinary.com/dxbw59hvb/image/upload/v1746942574/icons8-check-mark-500_oiavd5.png'
-                  alt='Checkmark'
+                  alt='Checkmark Icon'
                   style='width: 96px; height: 96px; margin: 24px auto; display: block;'
                 />
                 <!-- CTA Button -->
                 <a
-                  href='{{link}}'
+                  href='#'
                   style='display: inline-block; background-color: #2563EB; color: #FFFFFF; font-size: 16px; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 8px; margin: 16px 0;'
                 >
-                  Verify Your Email
+                  Go to Dashboard
                 </a>
                 <!-- Fallback Link -->
                 <p
@@ -65,9 +68,15 @@
                   into your browser:
                   <br />
                   <a
-                    href='{{link}}'
+                    href='#'
                     style='color: #2563EB; text-decoration: underline; word-break: break-all;'
-                  >{{link}}</a>
+                  >#</a>
+                </p>
+                <!-- Note -->
+                <p
+                  style='font-size: 14px; color: #4B5563; margin: 24px 0 0; line-height: 1.5;'
+                >
+                  If you have any questions, please contact our support team.
                 </p>
               </td>
             </tr>
@@ -79,13 +88,13 @@
                 <p
                   style='font-size: 14px; color: #6B7280; margin: 0; line-height: 1.5;'
                 >
-                  &copy;
+                  ©
                   {{year}}
                   {{app}}. All rights reserved.
                 </p>
                 <p style='font-size: 14px; color: #6B7280; margin: 8px 0 0;'>
-                  If you did not sign up for this account, please ignore this
-                  email.
+                  Need help? Contact us at
+                  {{myMail}}
                 </p>
               </td>
             </tr>

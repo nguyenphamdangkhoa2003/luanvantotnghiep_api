@@ -8,9 +8,12 @@ import { OAuthProviderSchema } from '../auth/schemas/oauth-provider.schema';
 import { UsersController } from './users.controller';
 import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
 import { CloudinaryService } from '@/common/services/cloudinary.service';
+import { MailService } from '@/modules/mail/mail.service';
+import { MailModule } from '@/modules/mail/mail.module';
 
 @Module({
   imports: [
+    MailModule,
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       {
@@ -19,7 +22,13 @@ import { CloudinaryService } from '@/common/services/cloudinary.service';
       },
     ]),
   ],
-  providers: [UsersService, CommonService, JwtAuthService, CloudinaryService],
+  providers: [
+    UsersService,
+    CommonService,
+    JwtAuthService,
+    CloudinaryService,
+    MailService,
+  ],
   exports: [UsersService],
   controllers: [UsersController],
 })

@@ -1,42 +1,40 @@
+import { ROLES_KEY } from '@/modules/auth/decorators/roles.decorator';
+import { UserRole } from '@/modules/users/schemas/user.schema';
 import {
   Injectable,
   CanActivate,
   ExecutionContext,
-  UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Roles } from '@/modules/auth/decorators/roles.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const roles = this.reflector.getAllAndOverride<string[]>(Roles, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
-    if (!roles) {
+    if (!requiredRoles) {
       return true;
     }
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
-    if (!user) {
-      throw new UnauthorizedException('User not authenticated');
+    if (!user || !user.role) {
+      throw new ForbiddenException('User does not have a role assigned');
     }
 
-    if (!user.role) {
-      throw new UnauthorizedException('User role is missing');
-    }
+    const hasRole = requiredRoles.includes(user.role);
 
-    const userRoles = Array.isArray(user.role) ? user.role : [user.role];
-
-    const hasRole = userRoles.some((role: string) => roles.includes(role));
     if (!hasRole) {
-      throw new UnauthorizedException('User does not have required role');
+      throw new ForbiddenException(
+        `Access denied: User does not have the required role (${requiredRoles.join(' or ')})`,
+      );
     }
 
     return true;

@@ -30,6 +30,7 @@ import { VerificationStatus } from '@/common/enums/verification-status.enum';
 import { DriverLicense } from '@/modules/users/schemas/driver-license.schema';
 import { Vehicle } from '@/modules/users/schemas/vehicle.schema';
 import { PaymentMethod } from '@/modules/users/schemas/payment-method.schema';
+import { IdentityDocument } from '@/modules/users/schemas/identity-document.schema';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -97,7 +98,7 @@ export class User {
   @IsOptional()
   avatar: string;
 
-  // ============================= MODULE PROFILE ============================= 
+  // ============================= MODULE PROFILE =============================
 
   @Prop({ type: String, required: false })
   @IsOptional()
@@ -109,14 +110,9 @@ export class User {
   @IsDateString()
   dateOfBirth?: string;
 
-  @Prop({ type: Object, required: false })
+  @Prop({ type: IdentityDocument, required: false })
   @IsOptional()
-  identityDocument?: {
-    documentNumber: string;
-    documentImage: string; 
-    verificationStatus: VerificationStatus;
-    verifiedAt?: Date;
-  };
+  identityDocument?: IdentityDocument;
 
   @Prop({ type: DriverLicense, required: false })
   @IsOptional()
@@ -126,12 +122,6 @@ export class User {
   @IsOptional()
   @IsArray()
   vehicles?: Vehicle[];
-
-  // NEW: Tuyến đường cố định (cho tài xế)
-  // @Prop({ type: [Route], required: false })
-  // @IsOptional()
-  // @IsArray()
-  // routes?: Route[];
 
   // NEW: Phương thức thanh toán
   @Prop({ type: [PaymentMethod], required: false })
@@ -146,5 +136,6 @@ export class User {
   @Length(0, 500)
   bio?: string;
 }
-
 export const UserSchema = SchemaFactory.createForClass(User);
+
+UserSchema.index({ 'vehicles._id': 1 });

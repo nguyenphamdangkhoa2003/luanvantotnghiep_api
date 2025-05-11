@@ -21,7 +21,7 @@ async function bootstrap() {
     });
     app.use(cookieParser());
     app.enableCors({
-      origin: 'http://localhost:3001', 
+      origin: 'http://localhost:3001',
       credentials: true,
     });
     app.use(helmet());
@@ -40,6 +40,7 @@ async function bootstrap() {
       new ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
+        transform: true,
       }),
     );
     const port = process.env.PORT ?? 3000;

@@ -1,32 +1,16 @@
 import { VerificationStatus } from '@/common/enums/verification-status.enum';
 import { Prop, Schema } from '@nestjs/mongoose';
 import { IsDate, IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
-import { Types } from 'mongoose';
 
 @Schema()
-export class Vehicle {
-  @Prop({ type: Types.ObjectId, auto: true })
-  declare _id: Types.ObjectId;
-
+export class IdentityDocument {
   @Prop({ type: String, required: true })
   @IsString()
-  licensePlate: string; // Biển số xe
-
-  @Prop({ type: String, required: true })
-  @IsString()
-  model: string; // Mẫu xe (ví dụ: Toyota Camry)
-
-  @Prop({ type: Number, required: true })
-  seats: number; // Số chỗ ngồi
+  documentNumber: string;
 
   @Prop({ type: String, required: true })
   @IsUrl()
-  registrationDocument: string; // URL tới giấy đăng ký xe
-
-  @Prop({ type: String })
-  @IsOptional()
-  @IsUrl()
-  insuranceDocument?: string; // URL tới giấy bảo hiểm (tùy chọn)
+  documentImage: string;
 
   @Prop({
     type: String,

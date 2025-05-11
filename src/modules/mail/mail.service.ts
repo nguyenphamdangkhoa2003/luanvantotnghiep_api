@@ -9,6 +9,7 @@ export class MailService {
   private readonly logger: Logger;
   private readonly email: string;
   private readonly domain: string;
+
   constructor(
     private mailerService: MailerService,
     private readonly configService: ConfigService,
@@ -19,59 +20,63 @@ export class MailService {
     this.domain = this.configService.get<string>('domain')!;
   }
 
+  public async sendMail(
+    to: string,
+    subject: string,
+    template: string,
+    context: Record<string, any>,
+  ): Promise<void> {
+    try {
+      await this.mailerService.sendMail({
+        to,
+        subject,
+        template: `./${template}`,
+        context: {
+          app: 'XeShare',
+          year: new Date().getFullYear(),
+          myMail: this.email,
+          ...context,
+        },
+      });
+
+      this.logger.log(`Mail sent successfully to ${to} 🎉📨`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send mail to ${to}: ${error.message}`,
+        error.stack,
+      );
+      throw new Error(`Failed to send email: ${error.message}`);
+    }
+  }
+
   public async sendConfirmationEmail(user: User, token: string): Promise<void> {
     const { email, name } = user;
     const link = `http://${this.domain}/auth/confirm-email/${token}`;
 
-    try {
-      await this.mailerService.sendMail({
-        to: email,
-        subject: 'Welcome to XeShare! Confirm your Email',
-        template: './confirmation',
-        context: {
-          app: 'XeShare',
-          name,
-          email,
-          link,
-          year: new Date().getFullYear(),
-        },
-      });
-
-      this.logger.log(`Mail sent successfully to ${user.email} 🎉📨`);
-    } catch (error) {
-      this.logger.error(
-        `Failed to send mail to ${user.email}: ${error.message}`,
-        error.stack,
-      );
-      throw new Error(`Failed to send confirmation email: ${error.message}`);
-    }
+    await this.sendMail(
+      email,
+      'Welcome to XeShare! Confirm your Email',
+      'confirmation',
+      {
+        name,
+        email,
+        link,
+      },
+    );
   }
 
-  public async sendResetPasswordEmail(user: User, token: string) {
+  public async sendResetPasswordEmail(
+    user: User,
+    token: string,
+  ): Promise<void> {
     const { email, name } = user;
     const link = `http://${this.domain}/auth/reset-password?code=${token}`;
-    try {
-      await this.mailerService.sendMail({
-        to: email,
-        subject: 'Reset your password',
-        template: './reset_password',
-        context: {
-          app: 'XeShare',
-          name,
-          email,
-          myMail: this.email,
-          link,
-          year: new Date().getFullYear(),
-        },
-      });
 
-      this.logger.log(`Mail sent successfully to ${user.email} 🎉📨`);
-    } catch (error) {
-      this.logger.error(
-        `Failed to send mail to ${user.email}: ${error.message}`,
-        error.stack,
-      );
-      throw new Error(`Failed to send reset password email: ${error.message}`);
-    }
+    await this.sendMail(email, 'Reset your password', 'reset_password', {
+      name,
+      email,
+      myMail: this.email,
+      link,
+    });
   }
 }

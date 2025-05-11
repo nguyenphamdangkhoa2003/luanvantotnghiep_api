@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
   UnauthorizedException,
@@ -28,6 +30,14 @@ import { UpdateUserDto } from '@/modules/users/dto/update-user.dto';
 import { UpdateRoleDto } from '@/modules/users/dto/update-role.dto';
 import { VerificationStatus } from '@/common/enums/verification-status.enum';
 import { CloudinaryService } from '@/common/services/cloudinary.service';
+import { CreateVehicleDto } from '@/modules/users/dto/create-vehicle.dto';
+import { UpdateVehicleDto } from '@/modules/users/dto/update-vehicle.dto';
+import { ApproveDto } from '@/modules/users/dto/approve.dto';
+import { MailService } from '@/modules/mail/mail.service';
+import { Vehicle } from '@/modules/users/schemas/vehicle.schema';
+import { DriverLicense } from '@/modules/users/schemas/driver-license.schema';
+import { IdentityDocument } from '@/modules/users/schemas/identity-document.schema';
+import { VerifyDocumentDto } from '@/modules/users/dto/verify-document.dto';
 
 @Injectable()
 export class UsersService {
@@ -40,6 +50,7 @@ export class UsersService {
     private readonly oauthProviderModel: Model<OAuthProviderDocument>,
     private readonly commonService: CommonService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly mailService: MailService,
   ) {}
 
   // Tạo người dùng mới
@@ -456,6 +467,82 @@ export class UsersService {
     await user.save();
     return user;
   }
+  async approveDocument(
+    userId: Types.ObjectId,
+    type: 'driverLicense' | 'identityDocument',
+    verifyDocumentDto: VerifyDocumentDto,
+  ) {
+    const { action, reason } = verifyDocumentDto;
+
+    // Kiểm tra action hợp lệ
+    if (!['approve', 'reject'].includes(action)) {
+      throw new BadRequestException('Invalid action');
+    }
+
+    // Kiểm tra lý do khi reject
+    if (action === 'reject' && !reason) {
+      throw new BadRequestException('Reason is required for rejection');
+    }
+
+    // Tìm user
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    // Kiểm tra tài liệu tồn tại
+    if (!user[type]) {
+      throw new BadRequestException(`${type} not found`);
+    }
+
+    // Chuẩn bị dữ liệu cập nhật
+    const setData: any = {};
+    const isApproved = action === 'approve';
+    const verificationStatus = isApproved
+      ? VerificationStatus.APPROVED
+      : VerificationStatus.REJECTED;
+
+    setData[`${type}.verificationStatus`] = verificationStatus;
+    if (isApproved) {
+      setData[`${type}.verifiedAt`] = new Date();
+    }
+
+    // Cập nhật user
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $set: setData },
+        { new: true, runValidators: true },
+      )
+      .select('email driverLicense identityDocument');
+
+    console.log('updatedUser', updatedUser);
+
+    // Chuẩn bị email
+    const emailSubject = `${type === 'driverLicense' ? 'Driver License' : 'Identity Document'} Verification ${
+      isApproved ? 'Approved' : 'Rejected'
+    }`;
+    const emailTemplate = isApproved
+      ? 'document_approved'
+      : 'document_rejected';
+
+    // Gửi email thông báo
+    await this.mailService.sendMail(user.email, emailSubject, emailTemplate, {
+      name: user.name,
+      email: user.email,
+      documentType: type,
+      reason: reason,
+    });
+
+    return {
+      message: `Document ${type} ${action}d successfully`,
+      data: {
+        type,
+        verificationStatus,
+        ...(reason && { reason }),
+      },
+    };
+  }
 
   async uploadDocument(
     userId: Types.ObjectId,
@@ -476,7 +563,7 @@ export class UsersService {
 
     // Tải file lên Cloudinary
     const uploadResult = await this.cloudinaryService.uploadFile(file, {
-      folder: `car-sharing/documents/${type}/${userId}`,
+      folder: `xeshare/documents/${type}/${userId}`,
       resource_type: 'auto',
     });
 
@@ -514,5 +601,208 @@ export class UsersService {
       documentImage: uploadResult.secure_url,
       verificationStatus: VerificationStatus.PENDING,
     };
+  }
+
+  async addVehicle(
+    userId: Types.ObjectId,
+    createVehicleDto: CreateVehicleDto,
+    files: {
+      registrationDocument?: Express.Multer.File[];
+      insuranceDocument?: Express.Multer.File[];
+    },
+  ) {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    if (user.role !== 'driver') {
+      throw new ForbiddenException('Only drivers can add vehicles');
+    }
+
+    // Upload file to Cloudinary
+    const uploadFile = async (file: Express.Multer.File, type: string) => {
+      const result = await this.cloudinaryService.uploadFile(file, {
+        folder: `xeshare/vehicle/${type}`,
+        resource_type: 'auto',
+        public_id: `${type}-${Date.now()}-${file.originalname}`,
+      });
+      return result.secure_url;
+    };
+
+    const vehicle = {
+      ...createVehicleDto,
+      registrationDocument: files.registrationDocument
+        ? await uploadFile(files.registrationDocument[0], 'registration')
+        : undefined,
+      insuranceDocument: files.insuranceDocument
+        ? await uploadFile(files.insuranceDocument[0], 'insurance')
+        : undefined,
+      verificationStatus: VerificationStatus.PENDING,
+      verifiedAt: undefined,
+      _id: new Types.ObjectId(),
+    };
+
+    if (vehicle.registrationDocument == undefined) {
+      throw new ForbiddenException('Registration document is required');
+    }
+
+    // Ép kiểu để khớp với Vehicle
+    const validatedVehicle: Vehicle = {
+      ...vehicle,
+      registrationDocument: vehicle.registrationDocument as string,
+      insuranceDocument: vehicle.insuranceDocument as string,
+    };
+
+    user.vehicles = user.vehicles || [];
+    user.vehicles.push(validatedVehicle);
+    await user.save();
+
+    return validatedVehicle;
+  }
+
+  async getVehicles(userId: Types.ObjectId) {
+    const user = await this.userModel.findById(userId).select('vehicles');
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user.vehicles || [];
+  }
+
+  async updateVehicle(
+    userId: Types.ObjectId,
+    vehicleId: string,
+    updateVehicleDto: UpdateVehicleDto,
+    files: {
+      registrationDocument?: Express.Multer.File[];
+      insuranceDocument?: Express.Multer.File[];
+    },
+  ) {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    if (user.role !== 'driver') {
+      throw new ForbiddenException('Only drivers can update vehicles');
+    }
+
+    const vehicle = user.vehicles?.find((v) => v._id.toString() === vehicleId);
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    // Upload file to Cloudinary if provided
+    const uploadFile = async (file: Express.Multer.File, type: string) => {
+      const result = await this.cloudinaryService.uploadFile(file, {
+        folder: `xeshare/vehicle/${type}`,
+        resource_type: 'auto',
+        public_id: `${type}-${Date.now()}-${file.originalname}`,
+      });
+      if (!result.secure_url) {
+        throw new InternalServerErrorException(
+          `Failed to upload ${type} document`,
+        );
+      }
+      return result.secure_url;
+    };
+
+    // Cập nhật các trường file nếu có
+    if (files.registrationDocument) {
+      vehicle.registrationDocument = await uploadFile(
+        files.registrationDocument[0],
+        'registration',
+      );
+      vehicle.verificationStatus = VerificationStatus.PENDING;
+      vehicle.verifiedAt = undefined;
+    }
+    if (files.insuranceDocument) {
+      vehicle.insuranceDocument = await uploadFile(
+        files.insuranceDocument[0],
+        'insurance',
+      );
+      vehicle.verificationStatus = VerificationStatus.PENDING;
+      vehicle.verifiedAt = undefined;
+    }
+
+    for (const [key, value] of Object.entries(updateVehicleDto)) {
+      if (value !== undefined) {
+        vehicle[key] = value;
+      }
+    }
+
+    user.markModified('vehicles');
+
+    await user.save();
+
+    return vehicle;
+  }
+
+  async deleteVehicle(userId: Types.ObjectId, vehicleId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    if (user.role !== 'driver') {
+      throw new ForbiddenException('Only drivers can delete vehicles');
+    }
+
+    const vehicleIndex = user.vehicles?.findIndex(
+      (v) => v._id.toString() === vehicleId,
+    );
+    if (vehicleIndex === -1 || vehicleIndex === undefined) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    user.vehicles?.splice(vehicleIndex, 1);
+    await user.save();
+
+    return this.commonService.generateMessage('Delete successful');
+  }
+
+  async approveVehicle(
+    userId: Types.ObjectId,
+    vehicleId: string,
+    approveDto: ApproveDto,
+  ) {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const vehicle = user.vehicles?.find((v) => v._id.toString() === vehicleId);
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    vehicle.verificationStatus = approveDto.verificationStatus;
+    vehicle.verifiedAt =
+      approveDto.verificationStatus === VerificationStatus.APPROVED
+        ? new Date()
+        : undefined;
+
+    await user.save();
+
+    const template =
+      approveDto.verificationStatus === VerificationStatus.APPROVED
+        ? 'vehicle_approved'
+        : 'vehicle_rejected';
+    const subject =
+      approveDto.verificationStatus === VerificationStatus.APPROVED
+        ? 'Vehicle Verification Approved'
+        : 'Vehicle Verification Rejected';
+
+    try {
+      await this.mailService.sendMail(user.email, subject, template, {
+        name: user.name,
+        email: user.email,
+        reason: approveDto.rejectionReason,
+        licensePlate: vehicle.licensePlate,
+        rejectionReason: approveDto.rejectionReason || 'No reason provided',
+        uploadLink: '#',
+      });
+    } catch (error) {
+      console.error(`Failed to send email to ${user.email}:`, error);
+    }
+
+    return vehicle;
   }
 }
