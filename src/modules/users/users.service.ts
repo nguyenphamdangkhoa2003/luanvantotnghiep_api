@@ -15,9 +15,9 @@ import { Model, Types } from 'mongoose';
 import { User, UserDocument, UserRole } from './schemas/user.schema';
 import * as bcrypt from 'bcrypt';
 import { CommonService } from '@/modules/common/common.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdatePasswordDto } from './dto/update-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
+import { CreateUserDto } from './DTOs/create-user.dto';
+import { UpdatePasswordDto } from './DTOs/update-password.dto';
+import { ResetPasswordDto } from './DTOs/reset-password.dto';
 import * as dayjs from 'dayjs';
 import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
 import {
@@ -26,18 +26,18 @@ import {
 } from '@/modules/auth/schemas/oauth-provider.schema';
 import { isNull, isUndefined } from '@/common/utils/validation.util';
 import { Credentials } from '@/modules/users/schemas/credentials.schema';
-import { UpdateUserDto } from '@/modules/users/dto/update-user.dto';
-import { UpdateRoleDto } from '@/modules/users/dto/update-role.dto';
+import { UpdateUserDto } from '@/modules/users/DTOs/update-user.dto';
+import { UpdateRoleDto } from '@/modules/users/DTOs/update-role.dto';
 import { VerificationStatus } from '@/common/enums/verification-status.enum';
 import { CloudinaryService } from '@/common/services/cloudinary.service';
-import { CreateVehicleDto } from '@/modules/users/dto/create-vehicle.dto';
-import { UpdateVehicleDto } from '@/modules/users/dto/update-vehicle.dto';
-import { ApproveDto } from '@/modules/users/dto/approve.dto';
+import { CreateVehicleDto } from '@/modules/users/DTOs/create-vehicle.dto';
+import { UpdateVehicleDto } from '@/modules/users/DTOs/update-vehicle.dto';
+import { ApproveDto } from '@/modules/users/DTOs/approve.dto';
 import { MailService } from '@/modules/mail/mail.service';
 import { Vehicle } from '@/modules/users/schemas/vehicle.schema';
 import { DriverLicense } from '@/modules/users/schemas/driver-license.schema';
 import { IdentityDocument } from '@/modules/users/schemas/identity-document.schema';
-import { VerifyDocumentDto } from '@/modules/users/dto/verify-document.dto';
+import { VerifyDocumentDto } from '@/modules/users/DTOs/verify-document.dto';
 
 @Injectable()
 export class UsersService {

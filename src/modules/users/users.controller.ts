@@ -1,7 +1,7 @@
 import { Roles } from '@/modules/auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '@/modules/auth/guard/jwt-auth.guard';
-import { UpdateRoleDto } from '@/modules/users/dto/update-role.dto';
-import { UpdateUserDto } from '@/modules/users/dto/update-user.dto';
+import { UpdateRoleDto } from '@/modules/users/DTOs/update-role.dto';
+import { UpdateUserDto } from '@/modules/users/DTOs/update-user.dto';
 import { UsersService } from '@/modules/users/users.service';
 import { AuthRequest } from '@/types';
 import {
@@ -29,13 +29,13 @@ import {
   FileInterceptor,
   FilesInterceptor,
 } from '@nestjs/platform-express';
-import { UploadDocumentDto } from '@/modules/users/dto/upload-document.dto';
+import { UploadDocumentDto } from '@/modules/users/DTOs/upload-document.dto';
 import { RolesGuard } from '@/modules/auth/guard/role.guard';
-import { CreateVehicleDto } from '@/modules/users/dto/create-vehicle.dto';
-import { UpdateVehicleDto } from '@/modules/users/dto/update-vehicle.dto';
-import { ApproveDto } from '@/modules/users/dto/approve.dto';
+import { CreateVehicleDto } from '@/modules/users/DTOs/create-vehicle.dto';
+import { UpdateVehicleDto } from '@/modules/users/DTOs/update-vehicle.dto';
+import { ApproveDto } from '@/modules/users/DTOs/approve.dto';
 import { Types } from 'mongoose';
-import { VerifyDocumentDto } from '@/modules/users/dto/verify-document.dto';
+import { VerifyDocumentDto } from '@/modules/users/DTOs/verify-document.dto';
 
 @Controller('users')
 export class UsersController {

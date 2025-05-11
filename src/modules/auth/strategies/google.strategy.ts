@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-google-oauth20';
-import { SignInByGoogleDto } from '../dto/sign-in-by-google.dto';
+import { SignInByGoogleDto } from '../DTOs/sign-in-by-google.dto';
 import { AuthService } from '@/modules/auth/auth.service';
 
 @Injectable()

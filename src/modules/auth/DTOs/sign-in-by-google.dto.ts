@@ -1,5 +1,5 @@
 import { NAME_REGEX } from '@/common/constants/regex.constant';
-import { SignUpDto } from '@/modules/auth/dto/sign-up.dto';
+import { SignUpDto } from '@/modules/auth/DTOs/sign-up.dto';
 import {
   IsEmail,
   IsOptional,

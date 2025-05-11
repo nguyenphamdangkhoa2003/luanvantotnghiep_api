@@ -15,27 +15,25 @@ import { User, UserDocument } from '@/modules/users/schemas/user.schema';
 import { MailService } from '@/modules/mail/mail.service';
 import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
 import { TokenTypeEnum } from '@/modules/jwt-auth/enums/types';
-import { SignUpDto } from '@/modules/auth/dto/sign-up.dto';
-import { SignInDto } from '@/modules/auth/dto/sign-in.dto';
+import { SignUpDto } from '@/modules/auth/DTOs/sign-up.dto';
+import { SignInDto } from '@/modules/auth/DTOs/sign-in.dto';
 import { isEmail, isStrongPassword } from 'class-validator';
 import { SLUG_REGEX } from '@/common/constants/regex.constant';
 import * as dayjs from 'dayjs';
 import { Credentials } from '@/modules/users/schemas/credentials.schema';
 import { IRefreshToken } from '@/modules/jwt-auth/interfaces/refresh-token.interface';
-import { EmailDto } from '@/modules/auth/dto/email.dto';
+import { EmailDto } from '@/modules/auth/DTOs/email.dto';
 import { isNull, isUndefined } from '@/common/utils/validation.util';
-import { ResetPasswordDto } from '@/modules/auth/dto/reset-password.dto';
+import { ResetPasswordDto } from '@/modules/auth/DTOs/reset-password.dto';
 import { IEmailToken } from '@/modules/jwt-auth/interfaces/email-token.interface';
-import { ChangePasswordDto } from '@/modules/auth/dto/change-password.dto';
+import { ChangePasswordDto } from '@/modules/auth/DTOs/change-password.dto';
 import * as crypto from 'crypto';
-import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto';
-import { RefreshTokenDto } from '@/modules/auth/dto/refresh-token.dto';
+import { ConfirmEmailDto } from '@/modules/auth/DTOs/confirm-email.dto';
+import { RefreshTokenDto } from '@/modules/auth/DTOs/refresh-token.dto';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { CommonService } from '@/modules/common/common.service';
 import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
-import { OAuthProvider } from './schemas/oauth-provider.schema';
-import { SignInByGoogleDto } from './dto/sign-in-by-google.dto';
-import { setCookies } from '@/common/utils/cookie.utils';
+import { SignInByGoogleDto } from './DTOs/sign-in-by-google.dto';
 
 @Injectable()
 export class AuthService {
