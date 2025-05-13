@@ -2,6 +2,7 @@ import { ICloundinaryConfig } from '@/config/interface/cloudinary-config.interfa
 import { IEmailConfig } from '@/config/interface/email-config.interface';
 import { IGoogleOauth2Config } from '@/config/interface/google-oauth2-config.interface';
 import { IJwtConfig } from '@/config/interface/jwt-config.interface';
+import { IVnpayConfig } from '@/config/interface/vnpay-config.interface';
 
 export interface IAppConfig {
   id: string;
@@ -20,4 +21,6 @@ export interface IAppConfig {
   googleOAuth: IGoogleOauth2Config;
   emailService: IEmailConfig;
   cloudinary: ICloundinaryConfig;
+  vnpay: IVnpayConfig;
+  goong_api_key: string;
 }

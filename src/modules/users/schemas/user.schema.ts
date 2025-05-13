@@ -1,7 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
-import * as bcrypt from 'bcrypt';
-import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
 import {
   IsArray,
   IsBoolean,
@@ -26,10 +24,8 @@ import {
   CredentialsSchema,
 } from '@/modules/users/schemas/credentials.schema';
 import { OAuthProvider } from '@/modules/auth/schemas/oauth-provider.schema';
-import { VerificationStatus } from '@/common/enums/verification-status.enum';
 import { DriverLicense } from '@/modules/users/schemas/driver-license.schema';
 import { Vehicle } from '@/modules/users/schemas/vehicle.schema';
-import { PaymentMethod } from '@/modules/users/schemas/payment-method.schema';
 import { IdentityDocument } from '@/modules/users/schemas/identity-document.schema';
 
 export enum UserRole {
@@ -122,12 +118,6 @@ export class User {
   @IsOptional()
   @IsArray()
   vehicles?: Vehicle[];
-
-  // NEW: Phương thức thanh toán
-  @Prop({ type: [PaymentMethod], required: false })
-  @IsOptional()
-  @IsArray()
-  paymentMethods?: PaymentMethod[];
 
   // NEW: Mô tả hồ sơ công khai (tùy chọn)
   @Prop({ type: String, required: false })

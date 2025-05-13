@@ -15,39 +15,39 @@ import { join } from 'path';
 
 class ConfigSchema {
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy mongo uri' })
+  @IsNotEmpty()
   MONGO_URI: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy app name' })
+  @IsNotEmpty()
   APP_NAME: string;
 
   @IsNumber()
-  @IsNotEmpty({ message: 'Không tìm thấy jwt access time' })
+  @IsNotEmpty()
   JWT_ACCESS_TIME: number;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy jwt confirmation secret' })
+  @IsNotEmpty()
   JWT_CONFIRMATION_SECRET: string;
 
   @IsNumber()
-  @IsNotEmpty({ message: 'Không tìm thấy jwt confirmation time' })
+  @IsNotEmpty()
   JWT_CONFIRMATION_TIME: number;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy jwt reset password secret' })
+  @IsNotEmpty()
   JWT_RESET_PASSWORD_SECRET: string;
 
   @IsNumber()
-  @IsNotEmpty({ message: 'Không tìm thấy jwt reset password time' })
+  @IsNotEmpty()
   JWT_RESET_PASSWORD_TIME: number;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy jwt refresh secret' })
+  @IsNotEmpty()
   JWT_REFRESH_SECRET: string;
 
   @IsNumber()
-  @IsNotEmpty({ message: 'Không tìm thấy jwt refresh time' })
+  @IsNotEmpty()
   JWT_REFRESH_TIME: number;
 
   @IsInt()
@@ -55,59 +55,79 @@ class ConfigSchema {
   PORT: number = 3000;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy session secret' })
+  @IsNotEmpty()
   SESSION_SECRET: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy google client id' })
+  @IsNotEmpty()
   GOOGLE_CLIENT_ID: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy google secret' })
+  @IsNotEmpty()
   GOOGLE_SECRET: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy google callback url' })
+  @IsNotEmpty()
   GOOGLE_CALLBACK_URL: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy email host' })
+  @IsNotEmpty()
   EMAIL_HOST: string;
 
   @IsNumber()
-  @IsNotEmpty({ message: 'Không tìm thấy email port' })
+  @IsNotEmpty()
   EMAIL_PORT: number;
 
   @IsBoolean()
   EMAIL_SECURE: boolean;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy email user' })
+  @IsNotEmpty()
   EMAIL_USER: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy email password' })
+  @IsNotEmpty()
   EMAIL_PASSWORD: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy app id' })
+  @IsNotEmpty()
   APP_ID: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy domain' })
+  @IsNotEmpty()
   DOMAIN: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy cloudinary name' })
+  @IsNotEmpty()
   CLOUDINARY_CLOUD_NAME: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy cloudinary api key' })
+  @IsNotEmpty()
   CLOUDINARY_API_KEY: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Không tìm thấy cloudinary api secret' })
+  @IsNotEmpty()
   CLOUDINARY_API_SECRET: string;
+
+  @IsString()
+  @IsNotEmpty()
+  VNPAY_TMN_CODE: string;
+
+  @IsString()
+  @IsNotEmpty()
+  VNPAY_HASH_SECRET: string;
+
+  @IsString()
+  @IsNotEmpty()
+  VNPAY_PAYMENT_GATEWAY: string;
+
+  @IsString()
+  @IsNotEmpty()
+  VNPAY_RETURN_URL: string;
+
+  @IsString()
+  @IsNotEmpty()
+  GOONG_API_KEY: string;
 }
 
 export const configModuleOptions: ConfigModuleOptions = {
@@ -197,6 +217,11 @@ export default (): IAppConfig => {
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
+    VNPAY_TMN_CODE: process.env.VNPAY_TMN_CODE,
+    VNPAY_HASH_SECRET: process.env.VNPAY_HASH_SECRET,
+    VNPAY_PAYMENT_GATEWAY: process.env.VNPAY_PAYMENT_GATEWAY,
+    VNPAY_RETURN_URL: process.env.VNPAY_RETURN_URL,
+    GOONG_API_KEY: process.env.GOONG_API_KEY,
   });
 
   return {
@@ -250,5 +275,12 @@ export default (): IAppConfig => {
       name: env.CLOUDINARY_CLOUD_NAME,
       api_secret: env.CLOUDINARY_API_SECRET,
     },
+    vnpay: {
+      hash_secret: env.VNPAY_HASH_SECRET,
+      tmn_code: env.VNPAY_TMN_CODE,
+      payment_gateway: env.VNPAY_PAYMENT_GATEWAY,
+      return_url: env.VNPAY_RETURN_URL,
+    },
+    goong_api_key: env.GOONG_API_KEY,
   };
 };

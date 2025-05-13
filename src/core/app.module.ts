@@ -11,11 +11,11 @@ import { CommonModule } from '@/modules/common/common.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerConfig } from '@/config/throttler.config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, RouterModule } from '@nestjs/core';
 import { JwtAuthGuard } from '@/modules/auth/guard/jwt-auth.guard';
 import { JwtAuthModule } from '@/modules/jwt-auth/jwt-auth.module';
 import { UsersModule } from '@/modules/users/users.module';
-import { PaymentMethodsModule } from '@/modules/payment-methods/payment-methods.module';
+import { RoutesModule } from '@/modules/routes/routes.module';
 
 const dbLogger = new Logger('Database');
 
@@ -28,9 +28,9 @@ const logDatabaseConnection = () => {
 
 @Module({
   imports: [
+    RoutesModule,
     UsersModule,
     JwtAuthModule,
-    PaymentMethodsModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       useClass: ThrottlerConfig,
