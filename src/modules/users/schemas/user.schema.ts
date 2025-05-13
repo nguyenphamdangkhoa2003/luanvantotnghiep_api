@@ -38,8 +38,7 @@ export type UserDocument = HydratedDocument<User>;
 
 @Schema()
 export class User {
-  @Prop({ type: Types.ObjectId, auto: true })
-  declare public _id: Types.ObjectId;
+  declare _id: string;
 
   @Prop({ required: true, type: String })
   @IsString()

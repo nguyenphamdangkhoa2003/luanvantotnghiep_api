@@ -4,6 +4,7 @@ import { HydratedDocument } from 'mongoose';
 export type RequestDocument = HydratedDocument<Request>;
 @Schema({ timestamps: true })
 export class Request {
+  declare _id: string;
   @Prop({ required: true, ref: 'User' })
   userId: string; // Người gửi yêu cầu
 

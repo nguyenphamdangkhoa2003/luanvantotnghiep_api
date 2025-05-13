@@ -407,7 +407,7 @@ export class UsersService {
   }
 
   async updateProfile(
-    userId: Types.ObjectId,
+    userId: string,
     updateUserDto: UpdateUserDto,
   ): Promise<User> {
     const user = await this.userModel.findById(userId).exec();
@@ -439,7 +439,7 @@ export class UsersService {
   }
 
   async updateRole(
-    userId: Types.ObjectId,
+    userId: string,
     updateRoleDto: UpdateRoleDto,
   ): Promise<User> {
     const user = await this.userModel.findById(userId).exec();
@@ -545,7 +545,7 @@ export class UsersService {
   }
 
   async uploadDocument(
-    userId: Types.ObjectId,
+    userId: string,
     file: Express.Multer.File,
     type: 'driverLicense' | 'identityDocument',
     documentNumber: string,
@@ -604,7 +604,7 @@ export class UsersService {
   }
 
   async addVehicle(
-    userId: Types.ObjectId,
+    userId: string,
     createVehicleDto: CreateVehicleDto,
     files: {
       registrationDocument?: Express.Multer.File[];
@@ -660,7 +660,7 @@ export class UsersService {
     return validatedVehicle;
   }
 
-  async getVehicles(userId: Types.ObjectId) {
+  async getVehicles(userId: string) {
     const user = await this.userModel.findById(userId).select('vehicles');
     if (!user) {
       throw new NotFoundException('User not found');
@@ -669,7 +669,7 @@ export class UsersService {
   }
 
   async updateVehicle(
-    userId: Types.ObjectId,
+    userId: string,
     vehicleId: string,
     updateVehicleDto: UpdateVehicleDto,
     files: {

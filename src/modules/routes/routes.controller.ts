@@ -17,13 +17,14 @@ import { UserRole } from '@/modules/users/schemas/user.schema';
 import { AdvancedSearchRouteDto } from '@/modules/routes/DTOs/advanced-search-route.dto';
 import { RequestRouteDto } from '@/modules/routes/DTOs/request-route.dto';
 import { HandleRequestDto } from '@/modules/routes/DTOs/handle-request.dto';
+import { GetPassengersDto } from '@/modules/routes/DTOs/get-passengers.dto';
 
 @Controller('routes')
 export class RoutesController {
   constructor(private readonly routesService: RoutesService) {}
 
-  //   @UseGuards(RolesGuard)
-  //   @Roles(UserRole.DRIVER)
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.DRIVER)
   @Post()
   async create(
     @Req() req: AuthRequest,
@@ -62,5 +63,14 @@ export class RoutesController {
   ) {
     const user = req.user;
     return this.routesService.handleRequest(user, handleRequestDto);
+  }
+
+  @Post('passengers')
+  async getPassengers(
+    @Body() getPassengersDto: GetPassengersDto,
+    @Req() req: AuthRequest,
+  ) {
+    const userId = req.user._id;
+    return this.routesService.getPassengers(userId, getPassengersDto);
   }
 }

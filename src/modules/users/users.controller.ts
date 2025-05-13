@@ -227,7 +227,7 @@ export class UsersController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   async getUserVehicles(@Param('userId') userId: string) {
-    return this.usersService.getVehicles(new Types.ObjectId(userId));
+    return this.usersService.getVehicles(userId);
   }
 
   @Patch(':userId/vehicles/:vehicleId')

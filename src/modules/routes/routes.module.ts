@@ -14,6 +14,10 @@ import {
   NotificationSchema,
 } from '@/modules/routes/schemas/notification.schema';
 import { User, UserSchema } from '@/modules/users/schemas/user.schema';
+import {
+  Passenger,
+  PassengerSchema,
+} from '@/modules/routes/schemas/Passenger.schema';
 
 @Module({
   imports: [
@@ -22,6 +26,10 @@ import { User, UserSchema } from '@/modules/users/schemas/user.schema';
       { name: Route.name, schema: RouteSchema },
       { name: Request.name, schema: RequestSchema },
       { name: Notification.name, schema: NotificationSchema },
+      {
+        name: Passenger.name,
+        schema: PassengerSchema,
+      },
       {
         name: User.name,
         schema: UserSchema,
