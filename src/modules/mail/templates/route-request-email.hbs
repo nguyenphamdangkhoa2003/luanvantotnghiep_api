@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ਸimilarly, the template uses a simple template for email templates. The template includes a header with the logo, a body with the request details, and a footer with contact information. The template is designed to be responsive and professional.
+
+<h1>New Route Join Request for {{ routeName }}</h1>
+<p>Dear {{ ownerName }},</p>
+<p>You have received a new request to join your route:</p>
+<ul>
+  <li><strong>Route:</strong> {{ routeName }}</li>
+  <li><strong>Requested by:</strong> {{ requesterName }}</li>
+  <li><strong>Message:</strong> {{ message }}</li>
+  <li><strong>Date:</strong> {{ requestDate }}</li>
+</ul>
+<p>Please log in to your XeShare account to review the request and respond.</p>
+<p><a href="{{ loginUrl }}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Request</a></p>
+<p>If you have any questions, contact us at <a href="mailto:{{ supportEmail }}">{{ supportEmail }}</a>.</p>
+<p>Thank you,<br>The XeShare Team</p>
+</body>
+</html>

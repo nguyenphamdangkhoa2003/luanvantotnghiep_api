@@ -14,6 +14,8 @@ import { AuthRequest } from '@/types';
 import { RolesGuard } from '@/modules/auth/guard/role.guard';
 import { Roles } from '@/modules/auth/decorators/roles.decorator';
 import { UserRole } from '@/modules/users/schemas/user.schema';
+import { AdvancedSearchRouteDto } from '@/modules/routes/DTOs/advanced-search-route.dto';
+import { RequestRouteDto } from '@/modules/routes/DTOs/request-route.dto';
 
 @Controller('routes')
 export class RoutesController {
@@ -34,5 +36,18 @@ export class RoutesController {
   @Get('search')
   async search(@Query() searchRouteDto: SearchRouteDto) {
     return this.routesService.search(searchRouteDto);
+  }
+
+  @Get('advanced-search')
+  async advancedSearch(
+    @Query() advancedSearchRouteDto: AdvancedSearchRouteDto,
+  ) {
+    return this.routesService.advancedSearch(advancedSearchRouteDto);
+  }
+
+  @Post('request')
+  async requestRoute(@Body() requestRouteDto: RequestRouteDto, @Req() req: AuthRequest) {
+    const user = req.user;
+    return this.routesService.requestRoute(user, requestRouteDto);
   }
 }
