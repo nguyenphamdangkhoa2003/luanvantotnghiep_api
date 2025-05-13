@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -19,6 +20,9 @@ import { NotificationService } from '@/modules/routes/notification.service';
 import { RequestRouteDto } from '@/modules/routes/DTOs/request-route.dto';
 import { User, UserDocument } from '@/modules/users/schemas/user.schema';
 import { MailService } from '@/modules/mail/mail.service';
+import { HandleRequestDto } from '@/modules/routes/DTOs/handle-request.dto';
+import { VerificationStatus } from '@/common/enums/verification-status.enum';
+import { RequestStatus } from '@/common/enums/request-status.enum';
 
 @Injectable()
 export class RoutesService {
@@ -259,5 +263,99 @@ export class RoutesService {
     );
 
     return request;
+  }
+
+  async handleRequest(
+    user: User,
+    handleRequestDto: HandleRequestDto,
+  ): Promise<Request> {
+    const { requestId, action, reason } = handleRequestDto;
+
+    // Tìm yêu cầu
+    const request = await this.requestModel.findById(requestId).exec();
+    if (!request) {
+      throw new NotFoundException('Request not found');
+    }
+
+    // Tìm tuyến đường
+    const route = await this.routeModel.findById(request.routeId).exec();
+    if (!route) {
+      throw new NotFoundException('Route not found');
+    }
+
+    // Kiểm tra quyền: Chỉ chủ xe được xử lý
+    if (route.userId !== user._id.toString()) {
+      throw new ForbiddenException(
+        'You are not authorized to handle this request',
+      );
+    }
+
+    // Kiểm tra trạng thái yêu cầu
+    if (request.status !== RequestStatus.PENDING) {
+      throw new ForbiddenException('Request has already been processed');
+    }
+    const requestUser = await this.userModel.findById(
+      new Types.ObjectId(request.userId),
+    );
+    if (!requestUser) throw new NotFoundException('User request not found');
+    // Xử lý hành động
+    if (action === RequestStatus.ACCEPT) {
+      // Cập nhật trạng thái yêu cầu
+      request.status = 'accepted';
+
+      // Giảm số ghế trống
+      if (route.seatsAvailable <= 0) {
+        throw new ForbiddenException('No seats available');
+      }
+      route.seatsAvailable -= 1;
+      await route.save();
+
+      // Gửi thông báo in-app
+      const message = `Your request to join route "${route.name}" has been accepted.`;
+      await this.notificationService.createNotification(
+        request.userId,
+        request.id,
+        message,
+      );
+
+      // Gửi email
+
+      await this.mailService.sendMail(
+        requestUser.email,
+        'Request Accepted',
+        `accept-request`,
+        {
+          requesterName: requestUser?.name,
+          routeName: route.name,
+          startTime: route.startTime,
+          price: route.price,
+          ownerEmail: user.email,
+          appUrl: 'https://xeshare.com/',
+        },
+      );
+    } else if (action === 'reject') {
+      request.status = 'rejected';
+
+      const message = `Your request to join route "${route.name}" has been rejected.`;
+      await this.notificationService.createNotification(
+        request.userId,
+        request.id,
+        message,
+      );
+      // Gửi email
+      await this.mailService.sendMail(
+        requestUser.email,
+        'Request Rejected',
+        'reject-request',
+        {
+          requesterName: requestUser.name,
+          routeName: route.name,
+          reason,
+        },
+      );
+    }
+
+    // Lưu yêu cầu đã cập nhật
+    return request.save();
   }
 }
