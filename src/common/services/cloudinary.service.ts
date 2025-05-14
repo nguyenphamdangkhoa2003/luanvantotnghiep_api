@@ -12,18 +12,37 @@ export class CloudinaryService {
     });
   }
 
-  async uploadFile(file: Express.Multer.File, options: any = {}): Promise<UploadApiResponse> {
+  async uploadFile(
+    file: Express.Multer.File,
+    options: any = {},
+  ): Promise<UploadApiResponse> {
     try {
       const result = await new Promise<UploadApiResponse>((resolve, reject) => {
-        cloudinary.uploader.upload_stream(options, (error, result) => {
-          if (error) return reject(error);
-          if (!result) return reject(new Error('Upload failed, no result returned'));
-          resolve(result);
-        }).end(file.buffer);
+        cloudinary.uploader
+          .upload_stream(options, (error, result) => {
+            if (error) return reject(error);
+            if (!result)
+              return reject(new Error('Upload failed, no result returned'));
+            resolve(result);
+          })
+          .end(file.buffer);
       });
       return result;
     } catch (error) {
-      throw new BadRequestException(`Failed to upload file to Cloudinary: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to upload file to Cloudinary: ${error.message}`,
+      );
     }
+  }
+
+  getPublicIdFromUrl(url: string): string | null {
+    const matches = url.match(/upload\/(?:v\d+\/)?(.+?)(?:\.\w+)?$/);
+    return matches ? matches[1] : null;
+  }
+
+  async deleteFile(publicId: string, resourceType: string): Promise<void> {
+    await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType,
+    });
   }
 }

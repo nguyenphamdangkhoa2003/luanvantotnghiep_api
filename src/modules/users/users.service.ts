@@ -18,7 +18,6 @@ import { CommonService } from '@/modules/common/common.service';
 import { CreateUserDto } from './DTOs/create-user.dto';
 import { UpdatePasswordDto } from './DTOs/update-password.dto';
 import { ResetPasswordDto } from './DTOs/reset-password.dto';
-import * as dayjs from 'dayjs';
 import { OAuthProvidersEnum } from '@/common/enums/oauth-providers.enum';
 import {
   OAuthProvider,
@@ -35,8 +34,6 @@ import { UpdateVehicleDto } from '@/modules/users/DTOs/update-vehicle.dto';
 import { ApproveDto } from '@/modules/users/DTOs/approve.dto';
 import { MailService } from '@/modules/mail/mail.service';
 import { Vehicle } from '@/modules/users/schemas/vehicle.schema';
-import { DriverLicense } from '@/modules/users/schemas/driver-license.schema';
-import { IdentityDocument } from '@/modules/users/schemas/identity-document.schema';
 import { VerifyDocumentDto } from '@/modules/users/DTOs/verify-document.dto';
 
 @Injectable()
@@ -447,7 +444,6 @@ export class UsersService {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
 
-    // Kiểm tra nếu chuyển sang DRIVER
     if (updateRoleDto.role === UserRole.DRIVER) {
       if (
         !user.driverLicense ||
@@ -460,7 +456,6 @@ export class UsersService {
       }
     }
 
-    // Cập nhật vai trò
     user.role = updateRoleDto.role;
     user.updatedAt = new Date();
 
@@ -474,28 +469,23 @@ export class UsersService {
   ) {
     const { action, reason } = verifyDocumentDto;
 
-    // Kiểm tra action hợp lệ
     if (!['approve', 'reject'].includes(action)) {
       throw new BadRequestException('Invalid action');
     }
 
-    // Kiểm tra lý do khi reject
     if (action === 'reject' && !reason) {
       throw new BadRequestException('Reason is required for rejection');
     }
 
-    // Tìm user
     const user = await this.userModel.findById(userId);
     if (!user) {
       throw new BadRequestException('User not found');
     }
 
-    // Kiểm tra tài liệu tồn tại
     if (!user[type]) {
       throw new BadRequestException(`${type} not found`);
     }
 
-    // Chuẩn bị dữ liệu cập nhật
     const setData: any = {};
     const isApproved = action === 'approve';
     const verificationStatus = isApproved
@@ -545,70 +535,94 @@ export class UsersService {
   }
 
   async uploadDocument(
-    userId: string,
-    frontFile: Express.Multer.File,
-    backFile: Express.Multer.File,
-    type: 'driverLicense' | 'identityDocument',
-    documentNumber: string,
+  userId: string,
+  frontFile: Express.Multer.File,
+  backFile: Express.Multer.File,
+  type: 'driverLicense' | 'identityDocument',
+  documentNumber: string,
+) {
+  // Validate document type
+  if (!['driverLicense', 'identityDocument'].includes(type)) {
+    throw new BadRequestException('Invalid document type');
+  }
+
+  // Validate file formats
+  const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
+  if (
+    !allowedMimes.includes(frontFile.mimetype) ||
+    !allowedMimes.includes(backFile.mimetype)
   ) {
-    // Validate document type
-    if (!['driverLicense', 'identityDocument'].includes(type)) {
-      throw new BadRequestException('Invalid document type');
-    }
+    throw new BadRequestException('Only JPEG, PNG, or PDF files are allowed');
+  }
 
-    // Validate file formats
-    const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
-    if (
-      !allowedMimes.includes(frontFile.mimetype) ||
-      !allowedMimes.includes(backFile.mimetype)
-    ) {
-      throw new BadRequestException('Only JPEG, PNG, or PDF files are allowed');
-    }
+  // Get current user to check for existing documents
+  const currentUser = await this.userModel
+    .findById(userId)
+    .select('driverLicense identityDocument');
 
-    // Upload both files to Cloudinary
-    const [frontUploadResult, backUploadResult] = await Promise.all([
-      this.cloudinaryService.uploadFile(frontFile, {
-        folder: `xeshare/documents/${type}/${userId}/front`,
-        resource_type: 'auto',
-      }),
-      this.cloudinaryService.uploadFile(backFile, {
-        folder: `xeshare/documents/${type}/${userId}/back`,
-        resource_type: 'auto',
-      }),
-    ]);
+  if (!currentUser) {
+    throw new BadRequestException('User not found');
+  }
 
-    // Update User schema
-    const updateData: any = {};
-    if (type === 'driverLicense') {
-      updateData.driverLicense = {
-        licenseNumber: documentNumber,
-        frontImage: frontUploadResult.secure_url,
-        backImage: backUploadResult.secure_url,
-        verificationStatus: VerificationStatus.PENDING,
-      };
-    } else {
-      updateData.identityDocument = {
-        documentNumber,
-        frontImage: frontUploadResult.secure_url,
-        backImage: backUploadResult.secure_url,
-        verificationStatus: VerificationStatus.PENDING,
-      };
-    }
+  // Store existing image URLs to delete later
+  let oldFrontImagePublicId: string | null = null;
+  let oldBackImagePublicId: string | null = null;
 
-    const updatedUser = await this.userModel
-      .findByIdAndUpdate(
-        userId,
-        { $set: updateData },
-        { new: true, runValidators: true },
-      )
-      .select('driverLicense identityDocument');
+  if (type === 'driverLicense' && currentUser.driverLicense?.frontImage) {
+    oldFrontImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
+      currentUser.driverLicense.frontImage,
+    );
+    oldBackImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
+      currentUser.driverLicense.backImage,
+    );
+  } else if (type === 'identityDocument' && currentUser.identityDocument?.frontImage) {
+    oldFrontImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
+      currentUser.identityDocument.frontImage,
+    );
+    oldBackImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
+      currentUser.identityDocument.backImage,
+    );
+  }
 
-    if (!updatedUser) {
-      throw new BadRequestException('User not found');
-    }
+  // Upload both files to Cloudinary
+  const [frontUploadResult, backUploadResult] = await Promise.all([
+    this.cloudinaryService.uploadFile(frontFile, {
+      folder: `xeshare/documents/${type}/${userId}/front`,
+      resource_type: 'auto',
+    }),
+    this.cloudinaryService.uploadFile(backFile, {
+      folder: `xeshare/documents/${type}/${userId}/back`,
+      resource_type: 'auto',
+    }),
+  ]);
 
-    return {
-      type,
+  // Delete old images from Cloudinary if they exist
+  const deletePromises: Promise<any>[] = [];
+  if (oldFrontImagePublicId) {
+    deletePromises.push(
+      this.cloudinaryService.deleteFile(oldFrontImagePublicId, 'image'),
+    );
+  }
+  if (oldBackImagePublicId) {
+    deletePromises.push(
+      this.cloudinaryService.deleteFile(oldBackImagePublicId, 'image'),
+    );
+  }
+  if (deletePromises.length > 0) {
+    await Promise.all(deletePromises);
+  }
+
+  // Update User schema
+  const updateData: any = {};
+  if (type === 'driverLicense') {
+    updateData.driverLicense = {
+      licenseNumber: documentNumber,
+      frontImage: frontUploadResult.secure_url,
+      backImage: backUploadResult.secure_url,
+      verificationStatus: VerificationStatus.PENDING,
+    };
+  } else {
+    updateData.identityDocument = {
       documentNumber,
       frontImage: frontUploadResult.secure_url,
       backImage: backUploadResult.secure_url,
@@ -616,6 +630,26 @@ export class UsersService {
     };
   }
 
+  const updatedUser = await this.userModel
+    .findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true },
+    )
+    .select('driverLicense identityDocument');
+
+  if (!updatedUser) {
+    throw new BadRequestException('User not found');
+  }
+
+  return {
+    type,
+    documentNumber,
+    frontImage: frontUploadResult.secure_url,
+    backImage: backUploadResult.secure_url,
+    verificationStatus: VerificationStatus.PENDING,
+  };
+}
   async addVehicle(
     userId: string,
     createVehicleDto: CreateVehicleDto,

@@ -54,6 +54,26 @@ export class UsersController {
     };
   }
 
+  @Patch('me/avatar')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (req, file, callback) => {
+        const allowedMimes = ['image/jpeg', 'image/png'];
+        if (!allowedMimes.includes(file.mimetype)) {
+          return callback(
+            new BadRequestException('Only JPEG, PNG files are allowed'),
+            false,
+          );
+        }
+        callback(null, true);
+      },
+    }),
+  )
+  async uploadAvatar(@Req() req: AuthRequest, @UploadedFiles() file) {
+    
+  }
+
   @Patch('me')
   async updateProfile(
     @Req() req: AuthRequest,
