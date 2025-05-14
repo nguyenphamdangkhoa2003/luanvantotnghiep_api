@@ -7,14 +7,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Request } from 'express';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '@/modules/auth/decorators/public.decorators';
 import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
 import { TokenTypeEnum } from '@/modules/jwt-auth/enums/types';
 import { IAccessToken } from '@/modules/jwt-auth/interfaces/access-token.interface';
 import { UsersService } from '@/modules/users/users.service';
-import { Types } from 'mongoose';
 import { AuthRequest } from '@/types';
 import { getCookies } from '@/common/utils/cookie.utils';
 
@@ -50,9 +48,7 @@ export class JwtAuthGuard implements CanActivate {
         token,
         TokenTypeEnum.ACCESS,
       );
-      const user = await this.userSerivce.findOneById(
-        new Types.ObjectId(payload.id),
-      );
+      const user = await this.userSerivce.findOneById(payload.id);
       if (!user) {
         throw new NotFoundException();
       }

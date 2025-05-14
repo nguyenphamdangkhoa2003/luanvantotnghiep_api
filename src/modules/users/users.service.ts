@@ -283,7 +283,7 @@ export class UsersService {
         this.commonService.generateMessage('ID người dùng không hợp lệ'),
       );
     }
-    const user = await this.findOneById(new Types.ObjectId(userId));
+    const user = await this.findOneById(userId);
     if (!user) throw new NotFoundException();
     const { oldPassword, newPassword } = dto;
 
@@ -392,7 +392,7 @@ export class UsersService {
     return user;
   }
 
-  public async findOneById(id: Types.ObjectId): Promise<UserDocument | null> {
+  public async findOneById(id: string): Promise<UserDocument | null> {
     const user = await this.userModel.findById(id).select('+password');
     await this.commonService.checkEntityExistence(user, User.name);
     return user;

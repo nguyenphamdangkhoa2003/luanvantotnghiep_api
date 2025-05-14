@@ -14,11 +14,23 @@ import {
   Notification,
   NotificationSchema,
 } from '@/modules/routes/schemas/notification.schema';
+import { ChatGateway } from './chat.gateway';
+import { JwtAuthService } from '@/modules/jwt-auth/jwt-auth.service';
+import { UsersService } from '@/modules/users/users.service';
+import {
+  OAuthProvider,
+  OAuthProviderSchema,
+} from '@/modules/auth/schemas/oauth-provider.schema';
+import { CloudinaryService } from '@/common/services/cloudinary.service';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Conversation.name, schema: ConversationSchema },
+      {
+        name: OAuthProvider.name,
+        schema: OAuthProviderSchema,
+      },
       { name: Message.name, schema: MessageSchema },
       {
         name: User.name,
@@ -34,7 +46,14 @@ import {
       },
     ]),
   ],
-  providers: [ChatService, NotificationService],
+  providers: [
+    ChatService,
+    NotificationService,
+    ChatGateway,
+    JwtAuthService,
+    UsersService,
+    CloudinaryService,
+  ],
   controllers: [ChatController],
   exports: [ChatService],
 })

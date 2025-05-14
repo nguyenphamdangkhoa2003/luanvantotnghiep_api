@@ -4,7 +4,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   Conversation,
   ConversationDocument,
@@ -14,8 +14,8 @@ import { NotificationService } from '../routes/notification.service';
 import { SendMessageDto } from '@/modules/chat/DTOs/send-message.dto';
 import { MailService } from '@/modules/mail/mail.service';
 import { User, UserDocument } from '@/modules/users/schemas/user.schema';
-import { Mode } from 'fs';
 import { Route, RouteDocument } from '@/modules/routes/schemas/routes.schema';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class ChatService {
@@ -45,6 +45,43 @@ export class ChatService {
     return conversation.save();
   }
 
+  // Kiểm tra cuộc trò chuyện tồn tại
+  private async checkConversationExists(
+    conversationId: string,
+    populateFields: { path: string; select: string }[] = [],
+  ): Promise<ConversationDocument> {
+    const conversation = await this.conversationModel
+      .findById(conversationId)
+      .populate(populateFields)
+      .exec();
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+    return conversation as ConversationDocument;
+  }
+
+  // Kiểm tra quyền truy cập cuộc trò chuyện
+  public checkConversationAuthorization(
+    conversation: ConversationDocument,
+    userId: string,
+  ): void {
+    if (
+      conversation.ownerId.toString() !== userId.toString() &&
+      conversation.passengerId.toString() !== userId.toString()
+    ) {
+      throw new ForbiddenException(
+        'You are not authorized to access this conversation',
+      );
+    }
+  }
+
+  // Xác định người nhận (recipient) trong cuộc trò chuyện
+  private getRecipientId(conversation: any, userId: string): string {
+    return conversation.ownerId._id.toString() === userId
+      ? conversation.passengerId._id.toString()
+      : conversation.ownerId._id.toString();
+  }
+
   // Gửi tin nhắn
   async sendMessage(
     userId: string,
@@ -52,28 +89,15 @@ export class ChatService {
   ): Promise<Message> {
     const { conversationId, content } = sendMessageDto;
 
-    // Kiểm tra cuộc trò chuyện tồn tại và populate các thông tin cần thiết
-    const conversation = (await this.conversationModel
-      .findById(conversationId)
-      .populate([
-        { path: 'ownerId', select: 'name email' },
-        { path: 'passengerId', select: 'name email' },
-        { path: 'routeId', select: 'name' },
-      ])
-      .exec()) as any;
-    if (!conversation) {
-      throw new NotFoundException('Conversation not found');
-    }
+    // Kiểm tra cuộc trò chuyện và populate thông tin
+    const conversation = (await this.checkConversationExists(conversationId, [
+      { path: 'ownerId', select: 'name email' },
+      { path: 'passengerId', select: 'name email' },
+      { path: 'routeId', select: 'name' },
+    ])) as any;
 
-    // Kiểm tra quyền: Chỉ chủ xe hoặc hành khách được nhắn
-    if (
-      conversation.ownerId._id.toString() !== userId &&
-      conversation.passengerId._id.toString() !== userId
-    ) {
-      throw new ForbiddenException(
-        'You are not authorized to send messages in this conversation',
-      );
-    }
+    // Kiểm tra quyền
+    this.checkConversationAuthorization(conversation, userId);
 
     // Tạo tin nhắn
     const message = new this.messageModel({
@@ -84,11 +108,7 @@ export class ChatService {
     });
     await message.save();
 
-    // Gửi thông báo in-app
-    const recipientId =
-      conversation.ownerId._id.toString() === userId
-        ? conversation.passengerId._id
-        : conversation.ownerId._id;
+    const recipientId = this.getRecipientId(conversation, userId);
     const notificationMessage = `New message from ${userId} in your conversation for route ${conversation.routeId.name}.`;
     await this.notificationService.createNotification(
       recipientId,
@@ -96,7 +116,6 @@ export class ChatService {
       notificationMessage,
     );
 
-    // Gửi email
     const sender = await this.userModel.findById(userId).select('name').exec();
     if (!sender) throw new NotFoundException('Sender not found');
 
@@ -114,7 +133,7 @@ export class ChatService {
         routeName: conversation.routeId.name,
         messageContent: content,
         senderName: sender.name,
-        appUrl: 'https://xeshare.com', // Thay bằng URL thực tế
+        appUrl: 'https://xeshare.com',
         conversationId: conversationId,
         year: new Date().getFullYear(),
       },
@@ -127,21 +146,8 @@ export class ChatService {
     userId: string,
     conversationId: string,
   ): Promise<Message[]> {
-    const conversation = await this.conversationModel
-      .findById(conversationId)
-      .exec();
-    if (!conversation) {
-      throw new NotFoundException('Conversation not found');
-    }
-
-    if (
-      conversation.ownerId.toString() !== userId &&
-      conversation.passengerId.toString() !== userId
-    ) {
-      throw new ForbiddenException(
-        'You are not authorized to view this conversation',
-      );
-    }
+    const conversation = await this.checkConversationExists(conversationId);
+    this.checkConversationAuthorization(conversation, userId);
 
     return this.messageModel
       .find({ conversationId })
@@ -150,11 +156,48 @@ export class ChatService {
   }
 
   async markAsRead(conversationId: string, userId: string) {
+    const conversation = await this.checkConversationExists(conversationId);
+    this.checkConversationAuthorization(conversation, userId);
+
     await this.messageModel
       .updateMany(
         { conversationId, senderId: { $ne: userId }, isRead: false },
         { isRead: true },
       )
       .exec();
+  }
+
+  async updateUserStatus(userId: string, isOnline: boolean): Promise<void> {
+    try {
+      // Kiểm tra userId hợp lệ
+      if (!userId || !Types.ObjectId.isValid(userId)) {
+        throw new Error('Invalid user ID');
+      }
+
+      // Cập nhật trạng thái online và lastSeen
+      const updateData: Partial<User> = {
+        isOnline,
+        lastSeen: isOnline ? undefined : new Date(),
+      };
+
+      const updatedUser = await this.userModel.findByIdAndUpdate(
+        userId,
+        { $set: updateData },
+        { new: true, lean: true },
+      );
+
+      if (!updatedUser) {
+        throw new Error(`User with ID ${userId} not found`);
+      }
+
+      Logger.log(
+        `Updated user status: ID=${userId}, isOnline=${isOnline}, lastSeen=${
+          isOnline ? 'null' : updateData.lastSeen
+        }`,
+      );
+    } catch (error) {
+      Logger.error(`Failed to update user status: ${error.message}`);
+      throw error;
+    }
   }
 }

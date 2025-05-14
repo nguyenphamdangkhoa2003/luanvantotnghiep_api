@@ -23,9 +23,7 @@ export class SessionSerializer extends PassportSerializer {
     done: (err: Error | null, user: User | null) => void,
   ): Promise<void> {
     try {
-      const user = await this.userService.findOneById(
-        new Types.ObjectId(payload.id),
-      );
+      const user = await this.userService.findOneById(payload.id);
       if (!user) {
         return done(
           new UnauthorizedException('Không tìm thấy người dùng'),
