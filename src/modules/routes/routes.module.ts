@@ -18,9 +18,11 @@ import {
   Passenger,
   PassengerSchema,
 } from '@/modules/routes/schemas/Passenger.schema';
+import { ChatModule } from '@/modules/chat/chat.module';
 
 @Module({
   imports: [
+    ChatModule,
     MailModule,
     MongooseModule.forFeature([
       { name: Route.name, schema: RouteSchema },

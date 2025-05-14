@@ -21,17 +21,18 @@ import { RequestRouteDto } from '@/modules/routes/DTOs/request-route.dto';
 import { User, UserDocument } from '@/modules/users/schemas/user.schema';
 import { MailService } from '@/modules/mail/mail.service';
 import { HandleRequestDto } from '@/modules/routes/DTOs/handle-request.dto';
-import { VerificationStatus } from '@/common/enums/verification-status.enum';
 import { RequestStatus } from '@/common/enums/request-status.enum';
 import {
   Passenger,
   PassengerDocument,
 } from '@/modules/routes/schemas/Passenger.schema';
 import { GetPassengersDto } from '@/modules/routes/DTOs/get-passengers.dto';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class RoutesService {
   private readonly goongApiKey: string;
+  private readonly REQUEST_EXPIRY_DAYS = 7;
   constructor(
     @InjectModel(Route.name) private routeModel: Model<RouteDocument>,
     @InjectModel(Request.name) private requestModel: Model<RequestDocument>,
@@ -431,5 +432,52 @@ export class RoutesService {
         createdAt: request.createdAt,
       };
     });
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_1AM)
+  async autoRejectExpiredRequests(): Promise<void> {
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() - this.REQUEST_EXPIRY_DAYS);
+
+    // Tìm các yêu cầu pending quá hạn
+    const expiredRequests = await this.requestModel
+      .find({
+        status: 'pending',
+        createdAt: { $lte: expiryDate },
+      })
+      .exec();
+
+    for (const request of expiredRequests) {
+      const route = await this.routeModel.findById(request.routeId).exec();
+      if (!route) {
+        continue;
+      }
+
+      request.status = 'rejected';
+      await request.save();
+
+      const message = `Your request to join route "${route.name}" has been automatically rejected due to no response after ${this.REQUEST_EXPIRY_DAYS} days.`;
+      await this.notificationService.createNotification(
+        request.userId,
+        request.id,
+        message,
+      );
+
+      // Gửi email
+      const userId = request.userId;
+      const requester = await this.userModel.findById(userId);
+      if (!requester)
+        throw new NotFoundException(`User not found by id: ${userId}`);
+      await this.mailService.sendMail(
+        requester.email,
+        'Request Automatically Rejected',
+        'reject-request',
+        {
+          requesterName: requester.name,
+          routeName: route.name,
+          reaso: `Your request to join route "${route.name}" has been automatically rejected because it was not processed within ${this.REQUEST_EXPIRY_DAYS} days. Please check other routes.`,
+        },
+      );
+    }
   }
 }

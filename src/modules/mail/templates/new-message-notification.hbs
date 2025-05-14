@@ -1,0 +1,91 @@
+<html lang='en'>
+  <head>
+    <meta charset='UTF-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <title>New Message Notification</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 20px auto;
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+      }
+      .header {
+        text-align: center;
+        padding: 20px 0;
+        background-color: #007bff;
+        color: #ffffff;
+        border-radius: 8px 8px 0 0;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+      .content {
+        padding: 20px;
+        line-height: 1.6;
+        color: #333333;
+      }
+      .content p {
+        margin: 10px 0;
+      }
+      .message {
+        background-color: #f9f9f9;
+        border-left: 4px solid #007bff;
+        padding: 10px;
+        margin: 10px 0;
+        font-style: italic;
+      }
+      .button {
+        text-align: center;
+        margin: 20px 0;
+      }
+      .button a {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: #ffffff;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .footer {
+        text-align: center;
+        padding: 10px;
+        font-size: 12px;
+        color: #777777;
+      }
+    </style>
+  </head>
+  <body>
+    <div class='container'>
+      <div class='header'>
+        <h1>New Message from XeShare</h1>
+      </div>
+      <div class='content'>
+        <p>Hello {{recipientName}},</p>
+        <p>You have received a new message in your conversation for the route
+          <strong>{{routeName}}</strong>.</p>
+        <div class='message'>
+          <p>{{messageContent}}</p>
+        </div>
+        <p>Sender: {{senderName}}</p>
+        <div class='button'>
+          <a href='{{appUrl}}/chat/{{conversationId}}'>View Conversation</a>
+        </div>
+        <p>If you have any questions, please contact our support team.</p>
+      </div>
+      <div class='footer'>
+        <p>&copy; {{year}} XeShare. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+</html>
