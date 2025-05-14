@@ -28,6 +28,7 @@ import {
 } from '@/modules/routes/schemas/Passenger.schema';
 import { GetPassengersDto } from '@/modules/routes/DTOs/get-passengers.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ChatService } from '@/modules/chat/chat.service';
 
 @Injectable()
 export class RoutesService {
@@ -42,6 +43,7 @@ export class RoutesService {
     private readonly configService: ConfigService,
     private notificationService: NotificationService,
     private mailService: MailService,
+    private chatService: ChatService,
   ) {
     this.goongApiKey = configService.getOrThrow<string>('goong_api_key');
   }
@@ -358,6 +360,12 @@ export class RoutesService {
               ownerEmail: user.email,
               appUrl: 'https://xeshare.com/',
             },
+          );
+          await this.chatService.createConversation(
+            requestId,
+            route.userId,
+            request.userId,
+            request.routeId,
           );
         } else if (action === 'reject') {
           request.status = 'rejected';

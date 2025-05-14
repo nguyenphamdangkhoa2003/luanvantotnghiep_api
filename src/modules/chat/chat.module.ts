@@ -10,7 +10,10 @@ import { Message, MessageSchema } from '@/modules/chat/schemas/message.schema';
 import { User, UserSchema } from '@/modules/users/schemas/user.schema';
 import { Route, RouteSchema } from '@/modules/routes/schemas/routes.schema';
 import { NotificationService } from '@/modules/routes/notification.service';
-import { Notification, NotificationSchema } from '@/modules/routes/schemas/notification.schema';
+import {
+  Notification,
+  NotificationSchema,
+} from '@/modules/routes/schemas/notification.schema';
 
 @Module({
   imports: [
@@ -33,5 +36,6 @@ import { Notification, NotificationSchema } from '@/modules/routes/schemas/notif
   ],
   providers: [ChatService, NotificationService],
   controllers: [ChatController],
+  exports: [ChatService],
 })
 export class ChatModule {}
