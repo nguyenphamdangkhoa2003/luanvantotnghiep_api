@@ -535,121 +535,124 @@ export class UsersService {
   }
 
   async uploadDocument(
-  userId: string,
-  frontFile: Express.Multer.File,
-  backFile: Express.Multer.File,
-  type: 'driverLicense' | 'identityDocument',
-  documentNumber: string,
-) {
-  // Validate document type
-  if (!['driverLicense', 'identityDocument'].includes(type)) {
-    throw new BadRequestException('Invalid document type');
-  }
-
-  // Validate file formats
-  const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
-  if (
-    !allowedMimes.includes(frontFile.mimetype) ||
-    !allowedMimes.includes(backFile.mimetype)
+    userId: string,
+    frontFile: Express.Multer.File,
+    backFile: Express.Multer.File,
+    type: 'driverLicense' | 'identityDocument',
+    documentNumber: string,
   ) {
-    throw new BadRequestException('Only JPEG, PNG, or PDF files are allowed');
-  }
+    // Validate document type
+    if (!['driverLicense', 'identityDocument'].includes(type)) {
+      throw new BadRequestException('Invalid document type');
+    }
 
-  // Get current user to check for existing documents
-  const currentUser = await this.userModel
-    .findById(userId)
-    .select('driverLicense identityDocument');
+    // Validate file formats
+    const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (
+      !allowedMimes.includes(frontFile.mimetype) ||
+      !allowedMimes.includes(backFile.mimetype)
+    ) {
+      throw new BadRequestException('Only JPEG, PNG, or PDF files are allowed');
+    }
 
-  if (!currentUser) {
-    throw new BadRequestException('User not found');
-  }
+    // Get current user to check for existing documents
+    const currentUser = await this.userModel
+      .findById(userId)
+      .select('driverLicense identityDocument');
 
-  // Store existing image URLs to delete later
-  let oldFrontImagePublicId: string | null = null;
-  let oldBackImagePublicId: string | null = null;
+    if (!currentUser) {
+      throw new BadRequestException('User not found');
+    }
 
-  if (type === 'driverLicense' && currentUser.driverLicense?.frontImage) {
-    oldFrontImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
-      currentUser.driverLicense.frontImage,
-    );
-    oldBackImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
-      currentUser.driverLicense.backImage,
-    );
-  } else if (type === 'identityDocument' && currentUser.identityDocument?.frontImage) {
-    oldFrontImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
-      currentUser.identityDocument.frontImage,
-    );
-    oldBackImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
-      currentUser.identityDocument.backImage,
-    );
-  }
+    // Store existing image URLs to delete later
+    let oldFrontImagePublicId: string | null = null;
+    let oldBackImagePublicId: string | null = null;
 
-  // Upload both files to Cloudinary
-  const [frontUploadResult, backUploadResult] = await Promise.all([
-    this.cloudinaryService.uploadFile(frontFile, {
-      folder: `xeshare/documents/${type}/${userId}/front`,
-      resource_type: 'auto',
-    }),
-    this.cloudinaryService.uploadFile(backFile, {
-      folder: `xeshare/documents/${type}/${userId}/back`,
-      resource_type: 'auto',
-    }),
-  ]);
+    if (type === 'driverLicense' && currentUser.driverLicense?.frontImage) {
+      oldFrontImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
+        currentUser.driverLicense.frontImage,
+      );
+      oldBackImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
+        currentUser.driverLicense.backImage,
+      );
+    } else if (
+      type === 'identityDocument' &&
+      currentUser.identityDocument?.frontImage
+    ) {
+      oldFrontImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
+        currentUser.identityDocument.frontImage,
+      );
+      oldBackImagePublicId = this.cloudinaryService.getPublicIdFromUrl(
+        currentUser.identityDocument.backImage,
+      );
+    }
 
-  // Delete old images from Cloudinary if they exist
-  const deletePromises: Promise<any>[] = [];
-  if (oldFrontImagePublicId) {
-    deletePromises.push(
-      this.cloudinaryService.deleteFile(oldFrontImagePublicId, 'image'),
-    );
-  }
-  if (oldBackImagePublicId) {
-    deletePromises.push(
-      this.cloudinaryService.deleteFile(oldBackImagePublicId, 'image'),
-    );
-  }
-  if (deletePromises.length > 0) {
-    await Promise.all(deletePromises);
-  }
+    // Upload both files to Cloudinary
+    const [frontUploadResult, backUploadResult] = await Promise.all([
+      this.cloudinaryService.uploadFile(frontFile, {
+        folder: `xeshare/documents/${type}/${userId}/front`,
+        resource_type: 'auto',
+      }),
+      this.cloudinaryService.uploadFile(backFile, {
+        folder: `xeshare/documents/${type}/${userId}/back`,
+        resource_type: 'auto',
+      }),
+    ]);
 
-  // Update User schema
-  const updateData: any = {};
-  if (type === 'driverLicense') {
-    updateData.driverLicense = {
-      licenseNumber: documentNumber,
-      frontImage: frontUploadResult.secure_url,
-      backImage: backUploadResult.secure_url,
-      verificationStatus: VerificationStatus.PENDING,
-    };
-  } else {
-    updateData.identityDocument = {
+    // Delete old images from Cloudinary if they exist
+    const deletePromises: Promise<any>[] = [];
+    if (oldFrontImagePublicId) {
+      deletePromises.push(
+        this.cloudinaryService.deleteFile(oldFrontImagePublicId, 'image'),
+      );
+    }
+    if (oldBackImagePublicId) {
+      deletePromises.push(
+        this.cloudinaryService.deleteFile(oldBackImagePublicId, 'image'),
+      );
+    }
+    if (deletePromises.length > 0) {
+      await Promise.all(deletePromises);
+    }
+
+    // Update User schema
+    const updateData: any = {};
+    if (type === 'driverLicense') {
+      updateData.driverLicense = {
+        licenseNumber: documentNumber,
+        frontImage: frontUploadResult.secure_url,
+        backImage: backUploadResult.secure_url,
+        verificationStatus: VerificationStatus.PENDING,
+      };
+    } else {
+      updateData.identityDocument = {
+        documentNumber,
+        frontImage: frontUploadResult.secure_url,
+        backImage: backUploadResult.secure_url,
+        verificationStatus: VerificationStatus.PENDING,
+      };
+    }
+
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $set: updateData },
+        { new: true, runValidators: true },
+      )
+      .select('driverLicense identityDocument');
+
+    if (!updatedUser) {
+      throw new BadRequestException('User not found');
+    }
+
+    return {
+      type,
       documentNumber,
       frontImage: frontUploadResult.secure_url,
       backImage: backUploadResult.secure_url,
       verificationStatus: VerificationStatus.PENDING,
     };
   }
-
-  const updatedUser = await this.userModel
-    .findByIdAndUpdate(
-      userId,
-      { $set: updateData },
-      { new: true, runValidators: true },
-    )
-    .select('driverLicense identityDocument');
-
-  if (!updatedUser) {
-    throw new BadRequestException('User not found');
-  }
-
-  return {
-    type,
-    documentNumber,
-    frontImage: frontUploadResult.secure_url,
-    backImage: backUploadResult.secure_url,
-    verificationStatus: VerificationStatus.PENDING,
-  };
-}
   async addVehicle(
     userId: string,
     createVehicleDto: CreateVehicleDto,
@@ -856,5 +859,47 @@ export class UsersService {
   public async getUsers() {
     const users = await this.userModel.find().select('-password').exec();
     return users;
+  }
+
+  async updateAvatar(userId: string, avatarFile: Express.Multer.File) {
+    // Validate file format
+    const allowedMimes = ['image/jpeg', 'image/png'];
+    if (!allowedMimes.includes(avatarFile.mimetype)) {
+      throw new BadRequestException('Only JPEG or PNG files are allowed');
+    }
+
+    // Find user
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Get public_id of old avatar if exists
+    let oldAvatarPublicId: string | null = null;
+    if (user.avatar) {
+      oldAvatarPublicId = this.cloudinaryService.getPublicIdFromUrl(
+        user.avatar,
+      );
+    }
+
+    // Upload new avatar to Cloudinary
+    const uploadResult = await this.cloudinaryService.uploadFile(avatarFile, {
+      folder: `xeshare/avatars/${userId}`,
+      resource_type: 'image',
+      public_id: `avatar-${Date.now()}-${avatarFile.originalname}`,
+    });
+
+    // Delete old avatar from Cloudinary if exists
+    if (oldAvatarPublicId) {
+      await this.cloudinaryService.deleteFile(oldAvatarPublicId, 'image');
+    }
+
+    // Update user avatar
+    user.avatar = uploadResult.secure_url;
+    await user.save();
+
+    return {
+      avatar: uploadResult.secure_url,
+    };
   }
 }

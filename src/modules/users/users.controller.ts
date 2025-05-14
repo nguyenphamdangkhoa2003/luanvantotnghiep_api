@@ -54,24 +54,41 @@ export class UsersController {
     };
   }
 
-  @Patch('me/avatar')
+  @Post('me/avatar')
   @UseInterceptors(
-    FileInterceptor('file', {
-      limits: { fileSize: 5 * 1024 * 1024 },
+    FileInterceptor('avatar', {
+      limits: { fileSize: 5 * 1024 * 1024 }, // Giới hạn 5MB mỗi file
       fileFilter: (req, file, callback) => {
-        const allowedMimes = ['image/jpeg', 'image/png'];
+        const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
         if (!allowedMimes.includes(file.mimetype)) {
           return callback(
-            new BadRequestException('Only JPEG, PNG files are allowed'),
+            new BadRequestException('Only accept JPEG, PNG or PDF files'),
             false,
           );
         }
         callback(null, true);
       },
     }),
-  )
-  async uploadAvatar(@Req() req: AuthRequest, @UploadedFiles() file) {
-    
+  ) // 'avatar' là field name trong form-data
+  async updateAvatar(
+    @Req() req: AuthRequest,
+    @UploadedFile() avatarFile: Express.Multer.File,
+  ) {
+    // Check if file is provided
+    if (!avatarFile) {
+      throw new BadRequestException('Avatar file is required');
+    }
+
+    // Get userId from authenticated user (giả định JWT payload chứa userId)
+    const userId = req.user['_id']; // Điều chỉnh theo cấu trúc payload của bạn
+
+    // Call service to update avatar
+    const result = await this.usersService.updateAvatar(userId, avatarFile);
+
+    return {
+      message: 'Avatar updated successfully',
+      data: result,
+    };
   }
 
   @Patch('me')
@@ -119,7 +136,7 @@ export class UsersController {
           const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
           if (!allowedMimes.includes(file.mimetype)) {
             return callback(
-              new BadRequestException('Chỉ chấp nhận file JPEG, PNG hoặc PDF'),
+              new BadRequestException('Only accept JPEG, PNG or PDF files'),
               false,
             );
           }
