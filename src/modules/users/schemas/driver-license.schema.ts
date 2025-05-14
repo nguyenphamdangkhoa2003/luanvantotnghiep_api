@@ -10,7 +10,11 @@ export class DriverLicense {
 
   @Prop({ type: String, required: true })
   @IsUrl()
-  licenseImage: string; 
+  frontImage: string;
+
+  @Prop({ type: String, required: true })
+  @IsUrl()
+  backImage: string; 
 
   @Prop({
     type: String,

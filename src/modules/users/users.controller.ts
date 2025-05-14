@@ -87,29 +87,41 @@ export class UsersController {
   }
 
   @Post('me/documents')
-  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
-    FileInterceptor('file', {
-      limits: { fileSize: 5 * 1024 * 1024 }, // Giới hạn 5MB
-      fileFilter: (req, file, callback) => {
-        const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
-        if (!allowedMimes.includes(file.mimetype)) {
-          return callback(
-            new BadRequestException('Only JPEG, PNG, or PDF files are allowed'),
-            false,
-          );
-        }
-        callback(null, true);
+    FileFieldsInterceptor(
+      [
+        { name: 'frontFile', maxCount: 1 },
+        { name: 'backFile', maxCount: 1 },
+      ],
+      {
+        limits: { fileSize: 5 * 1024 * 1024 }, // Giới hạn 5MB mỗi file
+        fileFilter: (req, file, callback) => {
+          const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
+          if (!allowedMimes.includes(file.mimetype)) {
+            return callback(
+              new BadRequestException('Chỉ chấp nhận file JPEG, PNG hoặc PDF'),
+              false,
+            );
+          }
+          callback(null, true);
+        },
       },
-    }),
+    ),
   )
   async uploadDocument(
     @Req() req: AuthRequest,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles()
+    files: {
+      frontFile?: Express.Multer.File[];
+      backFile?: Express.Multer.File[];
+    },
     @Body() uploadDocumentDto: UploadDocumentDto,
   ) {
-    if (!file) {
-      throw new BadRequestException('File is required');
+    console.log(files);
+    if (!files.frontFile?.[0] || !files.backFile?.[0]) {
+      throw new BadRequestException(
+        'Both front and back files must be provided.',
+      );
     }
 
     const userId = req.user._id;
@@ -117,13 +129,14 @@ export class UsersController {
 
     const result = await this.usersService.uploadDocument(
       userId,
-      file,
+      files.frontFile[0],
+      files.backFile[0],
       type,
       documentNumber,
     );
 
     return {
-      message: 'Document uploaded successfully, pending verification',
+      message: 'Document upload successful, awaiting verification',
       data: result,
     };
   }

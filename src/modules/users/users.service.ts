@@ -546,39 +546,51 @@ export class UsersService {
 
   async uploadDocument(
     userId: string,
-    file: Express.Multer.File,
+    frontFile: Express.Multer.File,
+    backFile: Express.Multer.File,
     type: 'driverLicense' | 'identityDocument',
     documentNumber: string,
   ) {
-    // Kiểm tra loại tài liệu hợp lệ
+    // Validate document type
     if (!['driverLicense', 'identityDocument'].includes(type)) {
       throw new BadRequestException('Invalid document type');
     }
 
-    // Kiểm tra định dạng file
+    // Validate file formats
     const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
-    if (!allowedMimes.includes(file.mimetype)) {
+    if (
+      !allowedMimes.includes(frontFile.mimetype) ||
+      !allowedMimes.includes(backFile.mimetype)
+    ) {
       throw new BadRequestException('Only JPEG, PNG, or PDF files are allowed');
     }
 
-    // Tải file lên Cloudinary
-    const uploadResult = await this.cloudinaryService.uploadFile(file, {
-      folder: `xeshare/documents/${type}/${userId}`,
-      resource_type: 'auto',
-    });
+    // Upload both files to Cloudinary
+    const [frontUploadResult, backUploadResult] = await Promise.all([
+      this.cloudinaryService.uploadFile(frontFile, {
+        folder: `xeshare/documents/${type}/${userId}/front`,
+        resource_type: 'auto',
+      }),
+      this.cloudinaryService.uploadFile(backFile, {
+        folder: `xeshare/documents/${type}/${userId}/back`,
+        resource_type: 'auto',
+      }),
+    ]);
 
-    // Cập nhật schema User
+    // Update User schema
     const updateData: any = {};
     if (type === 'driverLicense') {
       updateData.driverLicense = {
         licenseNumber: documentNumber,
-        licenseImage: uploadResult.secure_url,
+        frontImage: frontUploadResult.secure_url,
+        backImage: backUploadResult.secure_url,
         verificationStatus: VerificationStatus.PENDING,
       };
     } else {
       updateData.identityDocument = {
         documentNumber,
-        documentImage: uploadResult.secure_url,
+        frontImage: frontUploadResult.secure_url,
+        backImage: backUploadResult.secure_url,
         verificationStatus: VerificationStatus.PENDING,
       };
     }
@@ -598,7 +610,8 @@ export class UsersService {
     return {
       type,
       documentNumber,
-      documentImage: uploadResult.secure_url,
+      frontImage: frontUploadResult.secure_url,
+      backImage: backUploadResult.secure_url,
       verificationStatus: VerificationStatus.PENDING,
     };
   }

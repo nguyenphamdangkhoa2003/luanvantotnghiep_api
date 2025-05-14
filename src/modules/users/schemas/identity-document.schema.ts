@@ -10,7 +10,11 @@ export class IdentityDocument {
 
   @Prop({ type: String, required: true })
   @IsUrl()
-  documentImage: string;
+  frontImage: string;
+
+  @Prop({ type: String, required: true })
+  @IsUrl()
+  backImage: string;
 
   @Prop({
     type: String,
