@@ -41,6 +41,19 @@ import { VerifyDocumentDto } from '@/modules/users/DTOs/verify-document.dto';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get()
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async GetUsers() {
+    const data = await this.usersService.getUsers();
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Get users successfully',
+      data,
+    };
+  }
+
   @Patch('me')
   async updateProfile(
     @Req() req: AuthRequest,

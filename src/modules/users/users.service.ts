@@ -805,4 +805,9 @@ export class UsersService {
 
     return vehicle;
   }
+
+  public async getUsers() {
+    const users = await this.userModel.find().select('-password').exec();
+    return users;
+  }
 }
