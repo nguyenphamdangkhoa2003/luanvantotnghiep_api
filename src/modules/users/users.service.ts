@@ -268,6 +268,19 @@ export class UsersService {
     return user;
   }
 
+  async findUserById(userId: string): Promise<UserDocument | null> {
+    // Alerts: Kiểm tra email không rỗng
+    if (!userId) {
+      throw new BadRequestException(
+        this.commonService.generateMessage('Id không được cung cấp'),
+      );
+    }
+
+    // Queries: Tìm người dùng theo email
+    const user = await this.userModel.findById(userId).exec();
+    this.logger.debug(`Tìm người dùng với id: ${userId}`);
+    return user;
+  }
   // Cập nhật mật khẩu của người dùng
   // Highlights: Kiểm tra mật khẩu cũ, đảm bảo mật khẩu mới khác và cập nhật credentials
   async updatePassword(
@@ -522,6 +535,7 @@ export class UsersService {
       email: user.email,
       documentType: type,
       reason: reason,
+      uploadLink: '#',
     });
 
     return {

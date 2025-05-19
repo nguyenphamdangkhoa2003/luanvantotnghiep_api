@@ -88,6 +88,9 @@ export class Route {
 
   @Prop({ default: 'active' })
   status: string; // Trạng thái tuyến đường (active, inactive)
+
+  @Prop({ type: Number, default: 0 }) // Lưu chỉ số lộ trình đã chọn
+  routeIndex: number;
 }
 export const RouteSchema = SchemaFactory.createForClass(Route);
 

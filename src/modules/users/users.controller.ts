@@ -307,4 +307,11 @@ export class UsersController {
       approveDto,
     );
   }
+
+  @Get(':userId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async getUserById(@Param('userId') userId: string) {
+    return this.usersService.findUserById(userId);
+  }
 }

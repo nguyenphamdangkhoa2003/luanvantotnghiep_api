@@ -127,7 +127,7 @@ class ConfigSchema {
 
   @IsString()
   @IsNotEmpty()
-  GOONG_API_KEY: string;
+  MAPBOX_ACCESS_TOKEN: string;
 }
 
 export const configModuleOptions: ConfigModuleOptions = {
@@ -221,7 +221,7 @@ export default (): IAppConfig => {
     VNPAY_HASH_SECRET: process.env.VNPAY_HASH_SECRET,
     VNPAY_PAYMENT_GATEWAY: process.env.VNPAY_PAYMENT_GATEWAY,
     VNPAY_RETURN_URL: process.env.VNPAY_RETURN_URL,
-    GOONG_API_KEY: process.env.GOONG_API_KEY,
+    MAPBOX_ACCESS_TOKEN: process.env.MAPBOX_ACCESS_TOKEN,
   });
 
   return {
@@ -281,6 +281,6 @@ export default (): IAppConfig => {
       payment_gateway: env.VNPAY_PAYMENT_GATEWAY,
       return_url: env.VNPAY_RETURN_URL,
     },
-    goong_api_key: env.GOONG_API_KEY,
+    mapbox_access_token: env.MAPBOX_ACCESS_TOKEN,
   };
 };

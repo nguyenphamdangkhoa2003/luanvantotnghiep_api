@@ -22,5 +22,5 @@ export interface IAppConfig {
   emailService: IEmailConfig;
   cloudinary: ICloundinaryConfig;
   vnpay: IVnpayConfig;
-  goong_api_key: string;
+  mapbox_access_token: string;
 }

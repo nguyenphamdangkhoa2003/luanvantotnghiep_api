@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsPositive,
   IsInt,
+  Min,
 } from 'class-validator';
 
 export class CreateRouteDto {
@@ -41,4 +42,9 @@ export class CreateRouteDto {
   @IsNumber()
   @IsPositive()
   price: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  routeIndex?: number;
 }

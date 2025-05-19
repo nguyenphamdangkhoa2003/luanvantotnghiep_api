@@ -32,8 +32,9 @@ import { ChatService } from '@/modules/chat/chat.service';
 
 @Injectable()
 export class RoutesService {
-  private readonly goongApiKey: string;
+  private readonly mapboxAccessToken: string;
   private readonly REQUEST_EXPIRY_DAYS = 7;
+
   constructor(
     @InjectModel(Route.name) private routeModel: Model<RouteDocument>,
     @InjectModel(Request.name) private requestModel: Model<RequestDocument>,
@@ -45,17 +46,19 @@ export class RoutesService {
     private mailService: MailService,
     private chatService: ChatService,
   ) {
-    this.goongApiKey = configService.getOrThrow<string>('goong_api_key');
+    this.mapboxAccessToken = configService.getOrThrow<string>(
+      'mapbox_access_token',
+    );
   }
 
-  // Lấy tọa độ từ địa chỉ sử dụng Goong Geocoding API
+  // Lấy tọa độ từ địa chỉ sử dụng Mapbox Geocoding API
   async getCoordinates(address: string): Promise<{ lat: number; lng: number }> {
-    const url = `https://rsapi.goong.io/geocode?address=${encodeURIComponent(address)}&api_key=${this.goongApiKey}`;
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${this.mapboxAccessToken}`;
     const response = await axios.get(url);
-    const result = response.data.results[0];
+    const result = response.data.features[0];
     return {
-      lat: result.geometry.location.lat,
-      lng: result.geometry.location.lng,
+      lng: result.geometry.coordinates[0],
+      lat: result.geometry.coordinates[1],
     };
   }
 
@@ -63,73 +66,112 @@ export class RoutesService {
     start: [number, number],
     end: [number, number],
     waypoints?: [number, number][],
+    routeIndex: number = 0,
   ): Promise<{
     path: [number, number][];
     distance: number;
     duration: number;
   }> {
-    const origin = `${start[1]},${start[0]}`;
-    const destination = `${end[1]},${end[0]}`;
-    let url = `https://rsapi.goong.io/Direction?origin=${origin}&destination=${destination}&vehicle=car&api_key=${this.goongApiKey}`;
+    try {
+      if (waypoints && waypoints.length > 25) {
+        throw new ForbiddenException(
+          'Mapbox supports a maximum of 25 waypoints',
+        );
+      }
+      const coordinates = [
+        `${start[0]},${start[1]}`,
+        ...(waypoints ? waypoints.map((wp) => `${wp[0]},${wp[1]}`) : []),
+        `${end[0]},${end[1]}`,
+      ].join(';');
 
-    if (waypoints && waypoints.length > 0) {
-      const waypointsStr = waypoints.map((wp) => `${wp[1]},${wp[0]}`).join(';');
-      url += `&waypoints=${waypointsStr}`;
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?alternatives=true&geometries=geojson&language=vi&overview=full&steps=true&access_token=${this.mapboxAccessToken}`;
+      const response = await axios.get(url);
+
+      if (!response.data.routes || response.data.routes.length === 0) {
+        throw new NotFoundException(
+          'No routes found for the provided coordinates',
+        );
+      }
+
+      if (routeIndex < 0 || routeIndex >= response.data.routes.length) {
+        throw new ForbiddenException(
+          `Invalid route index: ${routeIndex}. Available routes: ${response.data.routes.length}`,
+        );
+      }
+
+      const route = response.data.routes[routeIndex];
+      const path = route.geometry.coordinates; // Đã là [[lng, lat], ...]
+      const distance = route.distance / 1000; // Mét sang km
+      const duration = route.duration / 60; // Giây sang phút
+
+      return { path, distance, duration };
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        throw new InternalServerErrorException(
+          `Mapbox Directions API error: ${error.response.data.message || error.message}`,
+        );
+      }
+      throw error;
     }
-
-    const response = await axios.get(url);
-    const route = response.data.routes[0];
-    const path = route.overview_polyline.points;
-    const distance =
-      route.legs.reduce((sum, leg) => sum + leg.distance.value, 0) / 1000;
-    const duration =
-      route.legs.reduce((sum, leg) => sum + leg.duration.value, 0) / 60;
-
-    // Giải mã polyline thành mảng tọa độ [lng, lat]
-    const decodedPath = require('@mapbox/polyline')
-      .decode(path)
-      .map(([lat, lng]) => [lng, lat]);
-
-    return { path: decodedPath, distance, duration };
   }
 
   async create(userId: string, createRouteDto: CreateRouteDto): Promise<Route> {
-    const { startAddress, endAddress, waypointAddresses, ...rest } =
-      createRouteDto;
+    try {
+      const {
+        startAddress,
+        endAddress,
+        waypointAddresses,
+        routeIndex = 0,
+        ...rest
+      } = createRouteDto;
 
-    const startCoords = await this.getCoordinates(startAddress);
-    const endCoords = await this.getCoordinates(endAddress);
-    const waypointCoords = waypointAddresses
-      ? await Promise.all(
-          waypointAddresses.map((addr) => this.getCoordinates(addr)),
-        )
-      : [];
+      const startCoords = await this.getCoordinates(startAddress);
+      const endCoords = await this.getCoordinates(endAddress);
+      const waypointCoords = waypointAddresses
+        ? await Promise.all(
+            waypointAddresses.map((addr) => this.getCoordinates(addr)),
+          )
+        : [];
 
-    const { path, distance, duration } = await this.getRoutePath(
-      [startCoords.lng, startCoords.lat],
-      [endCoords.lng, endCoords.lat],
-      waypointCoords.map((wp) => [wp.lng, wp.lat]),
-    );
+      const { path, distance, duration } = await this.getRoutePath(
+        [startCoords.lng, startCoords.lat],
+        [endCoords.lng, endCoords.lat],
+        waypointCoords.map((wp) => [wp.lng, wp.lat]),
+        routeIndex,
+      );
 
-    const route = new this.routeModel({
-      userId,
-      ...rest,
-      startPoint: {
-        type: 'Point',
-        coordinates: [startCoords.lng, startCoords.lat],
-      },
-      endPoint: { type: 'Point', coordinates: [endCoords.lng, endCoords.lat] },
-      waypoints: waypointCoords.map((wp) => ({
-        type: 'Point',
-        coordinates: [wp.lng, wp.lat],
-      })),
-      path: { type: 'LineString', coordinates: path },
-      distance,
-      duration,
-      status: 'active',
-    });
+      const route = new this.routeModel({
+        userId,
+        ...rest,
+        startPoint: {
+          type: 'Point',
+          coordinates: [startCoords.lng, startCoords.lat],
+        },
+        endPoint: {
+          type: 'Point',
+          coordinates: [endCoords.lng, endCoords.lat],
+        },
+        waypoints: waypointCoords.map((wp) => ({
+          type: 'Point',
+          coordinates: [wp.lng, wp.lat],
+        })),
+        path: { type: 'LineString', coordinates: path },
+        distance,
+        duration,
+        status: 'active',
+        routeIndex,
+      });
 
-    return route.save();
+      return await route.save();
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to create route');
+    }
   }
 
   async search(searchRouteDto: SearchRouteDto): Promise<Route[]> {
@@ -138,8 +180,15 @@ export class RoutesService {
       endAddress,
       maxDistance = 5000,
       date,
+      name,
+      frequency,
+      seatsAvailable,
+      priceRange,
+      status,
     } = searchRouteDto;
+
     const query: any = {};
+    const orConditions: any[] = [];
 
     if (date) {
       query.startTime = {
@@ -148,30 +197,128 @@ export class RoutesService {
       };
     }
 
-    if (startAddress) {
-      const startCoords = await this.getCoordinates(startAddress);
-      query.startPoint = {
-        $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [startCoords.lng, startCoords.lat],
-          },
-          $maxDistance: maxDistance,
-        },
-      };
+    const metersToRadians = (meters: number) => meters / 6378100;
+
+    if (startAddress || endAddress) {
+      const startCoords = startAddress
+        ? await this.getCoordinates(startAddress)
+        : null;
+      const endCoords = endAddress
+        ? await this.getCoordinates(endAddress)
+        : null;
+
+      // Điều kiện cho điểm xuất phát
+      if (startCoords) {
+        const startCondition = {
+          $or: [
+            // Kiểm tra startPoint và waypoints với $near
+            {
+              startPoint: {
+                $near: {
+                  $geometry: {
+                    type: 'Point',
+                    coordinates: [startCoords.lng, startCoords.lat],
+                  },
+                  $maxDistance: maxDistance,
+                },
+              },
+            },
+            {
+              waypoints: {
+                $near: {
+                  $geometry: {
+                    type: 'Point',
+                    coordinates: [startCoords.lng, startCoords.lat],
+                  },
+                  $maxDistance: maxDistance,
+                },
+              },
+            },
+            // Kiểm tra path với $geoWithin (vùng đệm hình tròn)
+            {
+              path: {
+                $geoWithin: {
+                  $centerSphere: [
+                    [startCoords.lng, startCoords.lat],
+                    metersToRadians(maxDistance),
+                  ],
+                },
+              },
+            },
+          ],
+        };
+        orConditions.push(startCondition);
+      }
+
+      if (endCoords) {
+        const endCondition = {
+          $or: [
+            {
+              endPoint: {
+                $near: {
+                  $geometry: {
+                    type: 'Point',
+                    coordinates: [endCoords.lng, endCoords.lat],
+                  },
+                  $maxDistance: maxDistance,
+                },
+              },
+            },
+            {
+              waypoints: {
+                $near: {
+                  $geometry: {
+                    type: 'Point',
+                    coordinates: [endCoords.lng, endCoords.lat],
+                  },
+                  $maxDistance: maxDistance,
+                },
+              },
+            },
+            {
+              path: {
+                $geoWithin: {
+                  $centerSphere: [
+                    [endCoords.lng, endCoords.lat],
+                    metersToRadians(maxDistance),
+                  ],
+                },
+              },
+            },
+          ],
+        };
+        orConditions.push(endCondition);
+      }
+
+      if (orConditions.length > 0) {
+        query.$and = orConditions;
+      }
     }
 
-    if (endAddress) {
-      const endCoords = await this.getCoordinates(endAddress);
-      query.endPoint = {
-        $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [endCoords.lng, endCoords.lat],
-          },
-          $maxDistance: maxDistance,
-        },
-      };
+    if (name) {
+      query.name = { $regex: name, $options: 'i' };
+    }
+
+    if (frequency) {
+      query.frequency = frequency;
+    }
+
+    if (seatsAvailable !== undefined) {
+      query.seatsAvailable = { $gte: seatsAvailable };
+    }
+
+    if (priceRange) {
+      query.price = {};
+      if (priceRange.min !== undefined) {
+        query.price.$gte = priceRange.min;
+      }
+      if (priceRange.max !== undefined) {
+        query.price.$lte = priceRange.max;
+      }
+    }
+
+    if (status) {
+      query.status = status;
     }
 
     return this.routeModel.find(query).exec();
@@ -193,11 +340,11 @@ export class RoutesService {
     if (pointAddress) {
       const pointCoords = await this.getCoordinates(pointAddress);
       query.path = {
-        $geoWithin: {
-          $centerSphere: [
-            [pointCoords.lng, pointCoords.lat],
-            maxDistance / 6378137, // Chuyển đổi mét thành radian (bán kính Trái Đất ~6378.137 km)
-          ],
+        $geoIntersects: {
+          $geometry: {
+            type: 'Point',
+            coordinates: [pointCoords.lng, pointCoords.lat],
+          },
         },
       };
     }
@@ -483,7 +630,7 @@ export class RoutesService {
         {
           requesterName: requester.name,
           routeName: route.name,
-          reaso: `Your request to join route "${route.name}" has been automatically rejected because it was not processed within ${this.REQUEST_EXPIRY_DAYS} days. Please check other routes.`,
+          reason: `Your request to join route "${route.name}" has been automatically rejected because it was not processed within ${this.REQUEST_EXPIRY_DAYS} days. Please check other routes.`,
         },
       );
     }
