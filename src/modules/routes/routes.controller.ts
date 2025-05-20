@@ -35,16 +35,9 @@ export class RoutesController {
     return this.routesService.create(userId, createRouteDto);
   }
 
-  @Get('search')
-  async search(@Query() searchRouteDto: SearchRouteDto) {
+  @Post('search')
+  async search(@Body() searchRouteDto: SearchRouteDto) {
     return this.routesService.search(searchRouteDto);
-  }
-
-  @Get('advanced-search')
-  async advancedSearch(
-    @Query() advancedSearchRouteDto: AdvancedSearchRouteDto,
-  ) {
-    return this.routesService.advancedSearch(advancedSearchRouteDto);
   }
 
   @Post('request')

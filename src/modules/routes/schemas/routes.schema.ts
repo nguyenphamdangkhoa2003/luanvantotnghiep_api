@@ -4,6 +4,18 @@ import { HydratedDocument } from 'mongoose';
 export type RouteDocument = HydratedDocument<Route>;
 
 @Schema()
+export class Waypoint {
+  @Prop({ type: [Number], required: true }) // [longitude, latitude]
+  coordinates: [number, number];
+
+  @Prop({ type: Number, required: true })
+  distance: number;
+
+  @Prop({ type: String, required: true })
+  name: string;
+}
+
+@Schema()
 export class Route {
   @Prop({ required: true, ref: 'User' })
   userId: string; // Người tạo tuyến đường
@@ -37,23 +49,8 @@ export class Route {
   })
   endPoint: { type: string; coordinates: [number, number] }; // Điểm đến
 
-  @Prop({
-    type: [
-      {
-        type: {
-          type: String,
-          enum: ['Point'],
-          required: true,
-        },
-        coordinates: {
-          type: [Number],
-          required: true,
-        },
-      },
-    ],
-    default: [],
-  })
-  waypoints: { type: string; coordinates: [number, number] }[]; // Các điểm dừng (tùy chọn)
+  @Prop({ type: [Waypoint], default: [] })
+  waypoints: Waypoint[];
 
   @Prop({
     type: {

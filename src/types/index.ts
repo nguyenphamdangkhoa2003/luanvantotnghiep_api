@@ -1,4 +1,4 @@
-import {  UserDocument } from '@/modules/users/schemas/user.schema';
+import { UserDocument } from '@/modules/users/schemas/user.schema';
 import { Request } from 'express';
 
 export interface ApiResponse<T = unknown> {
@@ -13,4 +13,9 @@ export interface AuthRequest extends Request {
 export interface IMessage {
   id: string;
   message: string;
+}
+
+export interface IPoint {
+  lng: number;
+  lat: number;
 }

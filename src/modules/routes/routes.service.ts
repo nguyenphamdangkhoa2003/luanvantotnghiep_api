@@ -50,95 +50,20 @@ export class RoutesService {
       'mapbox_access_token',
     );
   }
-
-  // Lấy tọa độ từ địa chỉ sử dụng Mapbox Geocoding API
-  async getCoordinates(address: string): Promise<{ lat: number; lng: number }> {
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${this.mapboxAccessToken}`;
-    const response = await axios.get(url);
-    const result = response.data.features[0];
-    return {
-      lng: result.geometry.coordinates[0],
-      lat: result.geometry.coordinates[1],
-    };
-  }
-
-  async getRoutePath(
-    start: [number, number],
-    end: [number, number],
-    waypoints?: [number, number][],
-    routeIndex: number = 0,
-  ): Promise<{
-    path: [number, number][];
-    distance: number;
-    duration: number;
-  }> {
-    try {
-      if (waypoints && waypoints.length > 25) {
-        throw new ForbiddenException(
-          'Mapbox supports a maximum of 25 waypoints',
-        );
-      }
-      const coordinates = [
-        `${start[0]},${start[1]}`,
-        ...(waypoints ? waypoints.map((wp) => `${wp[0]},${wp[1]}`) : []),
-        `${end[0]},${end[1]}`,
-      ].join(';');
-
-      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?alternatives=true&geometries=geojson&language=vi&overview=full&steps=true&access_token=${this.mapboxAccessToken}`;
-      const response = await axios.get(url);
-
-      if (!response.data.routes || response.data.routes.length === 0) {
-        throw new NotFoundException(
-          'No routes found for the provided coordinates',
-        );
-      }
-
-      if (routeIndex < 0 || routeIndex >= response.data.routes.length) {
-        throw new ForbiddenException(
-          `Invalid route index: ${routeIndex}. Available routes: ${response.data.routes.length}`,
-        );
-      }
-
-      const route = response.data.routes[routeIndex];
-      const path = route.geometry.coordinates; // Đã là [[lng, lat], ...]
-      const distance = route.distance / 1000; // Mét sang km
-      const duration = route.duration / 60; // Giây sang phút
-
-      return { path, distance, duration };
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        throw new InternalServerErrorException(
-          `Mapbox Directions API error: ${error.response.data.message || error.message}`,
-        );
-      }
-      throw error;
-    }
-  }
-
   async create(userId: string, createRouteDto: CreateRouteDto): Promise<Route> {
     try {
       const {
         startAddress,
+        startCoords,
         endAddress,
-        waypointAddresses,
+        endCoords,
+        waypoints,
         routeIndex = 0,
+        path,
+        distance,
+        duration,
         ...rest
       } = createRouteDto;
-
-      const startCoords = await this.getCoordinates(startAddress);
-      const endCoords = await this.getCoordinates(endAddress);
-      const waypointCoords = waypointAddresses
-        ? await Promise.all(
-            waypointAddresses.map((addr) => this.getCoordinates(addr)),
-          )
-        : [];
-
-      const { path, distance, duration } = await this.getRoutePath(
-        [startCoords.lng, startCoords.lat],
-        [endCoords.lng, endCoords.lat],
-        waypointCoords.map((wp) => [wp.lng, wp.lat]),
-        routeIndex,
-      );
 
       const route = new this.routeModel({
         userId,
@@ -151,11 +76,8 @@ export class RoutesService {
           type: 'Point',
           coordinates: [endCoords.lng, endCoords.lat],
         },
-        waypoints: waypointCoords.map((wp) => ({
-          type: 'Point',
-          coordinates: [wp.lng, wp.lat],
-        })),
-        path: { type: 'LineString', coordinates: path },
+        waypoints,
+        path,
         distance,
         duration,
         status: 'active',
@@ -170,14 +92,15 @@ export class RoutesService {
       ) {
         throw error;
       }
+      console.log(error);
       throw new InternalServerErrorException('Failed to create route');
     }
   }
 
   async search(searchRouteDto: SearchRouteDto): Promise<Route[]> {
     const {
-      startAddress,
-      endAddress,
+      startCoords,
+      endCoords,
       maxDistance = 5000,
       date,
       name,
@@ -199,100 +122,78 @@ export class RoutesService {
 
     const metersToRadians = (meters: number) => meters / 6378100;
 
-    if (startAddress || endAddress) {
-      const startCoords = startAddress
-        ? await this.getCoordinates(startAddress)
-        : null;
-      const endCoords = endAddress
-        ? await this.getCoordinates(endAddress)
-        : null;
+    if (startCoords) {
+      orConditions.push(
+        {
+          startPoint: {
+            $geoWithin: {
+              $centerSphere: [
+                [startCoords.lng, startCoords.lat],
+                metersToRadians(maxDistance),
+              ],
+            },
+          },
+        },
+        {
+          waypoints: {
+            $geoWithin: {
+              $centerSphere: [
+                [startCoords.lng, startCoords.lat],
+                metersToRadians(maxDistance),
+              ],
+            },
+          },
+        },
+        {
+          path: {
+            $geoWithin: {
+              $centerSphere: [
+                [startCoords.lng, startCoords.lat],
+                metersToRadians(maxDistance),
+              ],
+            },
+          },
+        },
+      );
+    }
 
-      // Điều kiện cho điểm xuất phát
-      if (startCoords) {
-        const startCondition = {
-          $or: [
-            // Kiểm tra startPoint và waypoints với $near
-            {
-              startPoint: {
-                $near: {
-                  $geometry: {
-                    type: 'Point',
-                    coordinates: [startCoords.lng, startCoords.lat],
-                  },
-                  $maxDistance: maxDistance,
-                },
-              },
+    if (endCoords) {
+      orConditions.push(
+        {
+          endPoint: {
+            $geoWithin: {
+              $centerSphere: [
+                [endCoords.lng, endCoords.lat],
+                metersToRadians(maxDistance),
+              ],
             },
-            {
-              waypoints: {
-                $near: {
-                  $geometry: {
-                    type: 'Point',
-                    coordinates: [startCoords.lng, startCoords.lat],
-                  },
-                  $maxDistance: maxDistance,
-                },
-              },
+          },
+        },
+        {
+          waypoints: {
+            $geoWithin: {
+              $centerSphere: [
+                [endCoords.lng, endCoords.lat],
+                metersToRadians(maxDistance),
+              ],
             },
-            // Kiểm tra path với $geoWithin (vùng đệm hình tròn)
-            {
-              path: {
-                $geoWithin: {
-                  $centerSphere: [
-                    [startCoords.lng, startCoords.lat],
-                    metersToRadians(maxDistance),
-                  ],
-                },
-              },
+          },
+        },
+        {
+          path: {
+            $geoWithin: {
+              $centerSphere: [
+                [endCoords.lng, endCoords.lat],
+                metersToRadians(maxDistance),
+              ],
             },
-          ],
-        };
-        orConditions.push(startCondition);
-      }
+          },
+        },
+      );
+    }
 
-      if (endCoords) {
-        const endCondition = {
-          $or: [
-            {
-              endPoint: {
-                $near: {
-                  $geometry: {
-                    type: 'Point',
-                    coordinates: [endCoords.lng, endCoords.lat],
-                  },
-                  $maxDistance: maxDistance,
-                },
-              },
-            },
-            {
-              waypoints: {
-                $near: {
-                  $geometry: {
-                    type: 'Point',
-                    coordinates: [endCoords.lng, endCoords.lat],
-                  },
-                  $maxDistance: maxDistance,
-                },
-              },
-            },
-            {
-              path: {
-                $geoWithin: {
-                  $centerSphere: [
-                    [endCoords.lng, endCoords.lat],
-                    metersToRadians(maxDistance),
-                  ],
-                },
-              },
-            },
-          ],
-        };
-        orConditions.push(endCondition);
-      }
-
-      if (orConditions.length > 0) {
-        query.$and = orConditions;
-      }
+    if (orConditions.length > 0) {
+      query.$or = orConditions; // Thay $and bằng $or để tránh xung đột
     }
 
     if (name) {
@@ -322,53 +223,6 @@ export class RoutesService {
     }
 
     return this.routeModel.find(query).exec();
-  }
-
-  async advancedSearch(
-    advancedSearchRouteDto: AdvancedSearchRouteDto,
-  ): Promise<Route[]> {
-    const {
-      pointAddress,
-      maxDistance = 5000,
-      priceRange,
-      seatsAvailable,
-      frequency,
-      date,
-    } = advancedSearchRouteDto;
-    const query: any = {};
-
-    if (pointAddress) {
-      const pointCoords = await this.getCoordinates(pointAddress);
-      query.path = {
-        $geoIntersects: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [pointCoords.lng, pointCoords.lat],
-          },
-        },
-      };
-    }
-
-    if (priceRange) {
-      query.price = { $gte: priceRange.min, $lte: priceRange.max };
-    }
-
-    if (seatsAvailable) {
-      query.seatsAvailable = { $gte: seatsAvailable };
-    }
-
-    if (frequency) {
-      query.frequency = frequency;
-    }
-
-    if (date) {
-      query.startTime = {
-        $gte: new Date(date),
-        $lte: new Date(new Date(date).setHours(23, 59, 59)),
-      };
-    }
-
-    return this.routeModel.find(query).limit(10).skip(0).exec();
   }
 
   async requestRoute(

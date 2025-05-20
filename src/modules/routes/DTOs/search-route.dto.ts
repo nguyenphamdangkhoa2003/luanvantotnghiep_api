@@ -1,19 +1,19 @@
+import { Point } from '@/modules/routes/DTOs/create-route.dto';
 import {
   IsString,
   IsOptional,
   IsNumber,
   IsDateString,
   Min,
+  IsNotEmpty,
 } from 'class-validator';
 
 export class SearchRouteDto {
-  @IsString()
-  @IsOptional()
-  startAddress?: string; // Địa chỉ điểm xuất phát
+  @IsNotEmpty()
+  startCoords: Point;
 
-  @IsString()
-  @IsOptional()
-  endAddress?: string; // Địa chỉ điểm đến
+  @IsNotEmpty()
+  endCoords: Point;
 
   @IsNumber()
   @IsOptional()
