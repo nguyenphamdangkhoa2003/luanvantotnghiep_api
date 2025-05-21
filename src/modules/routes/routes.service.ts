@@ -222,7 +222,7 @@ export class RoutesService {
       query.status = status;
     }
 
-    return this.routeModel.find(query).exec();
+    return await this.routeModel.find(query).populate('userId').exec();
   }
 
   async requestRoute(
