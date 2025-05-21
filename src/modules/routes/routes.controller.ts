@@ -6,6 +6,7 @@ import {
   Query,
   Req,
   UseGuards,
+  Param,
 } from '@nestjs/common';
 import { RoutesService } from './routes.service';
 import { CreateRouteDto } from '@/modules/routes/DTOs/create-route.dto';
@@ -18,6 +19,7 @@ import { AdvancedSearchRouteDto } from '@/modules/routes/DTOs/advanced-search-ro
 import { RequestRouteDto } from '@/modules/routes/DTOs/request-route.dto';
 import { HandleRequestDto } from '@/modules/routes/DTOs/handle-request.dto';
 import { GetPassengersDto } from '@/modules/routes/DTOs/get-passengers.dto';
+import { Public } from '@/modules/auth/decorators/public.decorators';
 
 @Controller('routes')
 export class RoutesController {
@@ -65,5 +67,12 @@ export class RoutesController {
   ) {
     const userId = req.user._id;
     return this.routesService.getPassengers(userId, getPassengersDto);
+  }
+
+  @Public()
+  @Get(':routeId')
+  async getRouteById(@Param('routeId') routeId: string) {
+    const route = this.routesService.getRouteById(routeId);
+    return route;
   }
 }

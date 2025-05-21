@@ -489,4 +489,11 @@ export class RoutesService {
       );
     }
   }
+
+  public async getRouteById(routeId: string) {
+    const route = await this.routeModel.findById(routeId).exec();
+    if (!route)
+      return new NotFoundException('Route by id: ' + routeId + ' not found');
+    return route;
+  }
 }
