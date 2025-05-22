@@ -19,6 +19,9 @@ export class Request {
 
   @Prop()
   declare createdAt: Date;
+
+  @Prop({ type: Number, required: true, min: 1 })
+  seats: number;
 }
 
 export const RequestSchema = SchemaFactory.createForClass(Request);

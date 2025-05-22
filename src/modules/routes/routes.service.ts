@@ -32,6 +32,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { ChatService } from '@/modules/chat/chat.service';
 import { MembershipService } from '@/modules/membership/membership.service';
 import { MembershipPackageType } from '@/common/enums/membership-package-type.enum';
+import { CancelRequestDto } from '@/modules/routes/DTOs/cancel-request.dto';
 
 @Injectable()
 export class RoutesService {
@@ -233,7 +234,7 @@ export class RoutesService {
     user: User,
     requestRouteDto: RequestRouteDto,
   ): Promise<Request> {
-    const { routeId, message } = requestRouteDto;
+    const { routeId, message, seats } = requestRouteDto;
 
     // Kiểm tra tuyến đường tồn tại
     const route = await this.routeModel.findById(routeId).exec();
@@ -245,12 +246,16 @@ export class RoutesService {
       new Types.ObjectId(route.userId),
     );
     if (!ownerCarUser) throw new InternalServerErrorException();
+    if (seats > route.seatsAvailable) {
+      throw new BadRequestException(`Only ${route.seatsAvailable} seat left`);
+    }
     // Tạo yêu cầu tham gia
     const request = new this.requestModel({
       userId: user._id,
       routeId,
       status: RequestStatus.PENDING,
       message,
+      seats,
     });
     await request.save();
 
@@ -326,7 +331,7 @@ export class RoutesService {
         if (!requestUser) throw new NotFoundException('User request not found');
 
         // Xử lý hành động
-        if (action === "accept") {
+        if (action === 'accept') {
           // Kiểm tra gói thành viên
           const membership = await this.membershipService.getMembershipInfo(
             user._id.toString(),
@@ -524,5 +529,83 @@ export class RoutesService {
     if (!route)
       return new NotFoundException('Route by id: ' + routeId + ' not found');
     return route;
+  }
+
+  async cancelBooking(
+    userId: string,
+    cancelBookingDto: CancelRequestDto,
+  ): Promise<Request> {
+    const { requestId } = cancelBookingDto;
+
+    // Tìm yêu cầu đặt chỗ
+    const request = (await this.requestModel
+      .findById(requestId)
+      .populate('routeId')
+      .exec()) as any;
+
+    if (!request) {
+      throw new NotFoundException('No booking request found.');
+    }
+
+    // Kiểm tra xem hành khách có phải là người tạo yêu cầu không
+    if (request.userId.toString() !== userId) {
+      throw new BadRequestException(
+        'You do not have the right to cancel this request.',
+      );
+    }
+
+    if (request.status === RequestStatus.CANCELLED) {
+      throw new BadRequestException('The request was previously canceled.');
+    }
+    if (request.status === RequestStatus.REJECTED) {
+      throw new BadRequestException(
+        'The request has been denied and cannot be cancelled.',
+      );
+    }
+
+    // Kiểm tra thời gian khởi hành
+    const route = request.routeId as Route;
+    const now = new Date();
+    if (new Date(route.startTime) < now) {
+      throw new BadRequestException(
+        'Cancellation is not possible because the trip has started or ended.',
+      );
+    }
+
+    // Cập nhật trạng thái thành 'cancelled'
+    request.status = RequestStatus.CANCELLED;
+    request.updatedAt = new Date();
+    await request.save();
+
+    const driver = await this.userModel
+      .findById(new Types.ObjectId(route.userId))
+      .exec();
+    if (!driver) {
+      throw new InternalServerErrorException('Driver not found.');
+    }
+
+    // Tạo thông báo in-app cho tài xế
+    const notificationMessage = `Passenger ${request.userId.name} has canceled the request to join the route: ${route.name}.`;
+    await this.notificationService.createNotification(
+      route.userId,
+      request.id,
+      notificationMessage,
+    );
+
+    // Gửi email thông báo cho tài xế
+    await this.mailService.sendMail(
+      driver.email,
+      'Reservation Request Cancelled',
+      'booking-cancelled',
+      {
+        routeName: route.name,
+        passengerName: request.userId.name,
+        cancelDate: new Date().toISOString().split('T')[0],
+        loginUrl: 'https://xeshare.com/login',
+        supportEmail: 'support@xeshare.com',
+      },
+    );
+
+    return request;
   }
 }

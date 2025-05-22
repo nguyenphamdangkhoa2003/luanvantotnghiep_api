@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class RequestRouteDto {
   @IsString()
@@ -7,4 +14,9 @@ export class RequestRouteDto {
 
   @IsOptional()
   message?: string; // Tin nhắn kèm theo (tùy chọn)
+
+  @IsNumber()
+  @Min(1)
+  @Transform(({ value }) => Number(value))
+  seats: number;
 }
