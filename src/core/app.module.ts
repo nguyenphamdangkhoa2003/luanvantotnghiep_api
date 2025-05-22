@@ -16,6 +16,8 @@ import { JwtAuthGuard } from '@/modules/auth/guard/jwt-auth.guard';
 import { JwtAuthModule } from '@/modules/jwt-auth/jwt-auth.module';
 import { UsersModule } from '@/modules/users/users.module';
 import { RoutesModule } from '@/modules/routes/routes.module';
+import { Membership } from '@/modules/membership/schemas/membership.schema';
+import { MembershipModule } from '@/modules/membership/membership.module';
 
 const dbLogger = new Logger('Database');
 
@@ -49,6 +51,7 @@ const logDatabaseConnection = () => {
       },
     }),
     AuthModule,
+    MembershipModule,
     CacheModule.register({
       isGlobal: true,
       ttl: configuration().jwt.refresh.time,

@@ -27,6 +27,7 @@ import { OAuthProvider } from '@/modules/auth/schemas/oauth-provider.schema';
 import { DriverLicense } from '@/modules/users/schemas/driver-license.schema';
 import { Vehicle } from '@/modules/users/schemas/vehicle.schema';
 import { IdentityDocument } from '@/modules/users/schemas/identity-document.schema';
+import { MembershipPackageType } from '@/common/enums/membership-package-type.enum';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -130,6 +131,42 @@ export class User {
 
   @Prop()
   lastSeen: Date;
+
+  @Prop({
+    type: {
+      packageType: {
+        type: String,
+        enum: Object.values(MembershipPackageType),
+        default: null,
+        required: false,
+      },
+      remainingRequests: {
+        type: Number,
+        default: 0,
+      },
+      endDate: {
+        type: Date,
+        default: null,
+        required: false,
+      },
+    },
+    default: () => ({
+      packageType: null,
+      remainingRequests: 0,
+      endDate: null,
+    }),
+  })
+  currentMembership: {
+    packageType?: MembershipPackageType;
+    remainingRequests: number;
+    endDate?: Date;
+  };
+
+  @Prop({ default: 0 })
+  rating: number;
+
+  @Prop({ default: 0 })
+  totalReviews: number;
 }
 export const UserSchema = SchemaFactory.createForClass(User);
 

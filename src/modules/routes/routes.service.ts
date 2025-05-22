@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -29,6 +30,8 @@ import {
 import { GetPassengersDto } from '@/modules/routes/DTOs/get-passengers.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ChatService } from '@/modules/chat/chat.service';
+import { MembershipService } from '@/modules/membership/membership.service';
+import { MembershipPackageType } from '@/common/enums/membership-package-type.enum';
 
 @Injectable()
 export class RoutesService {
@@ -42,6 +45,7 @@ export class RoutesService {
     @InjectModel(Passenger.name)
     private passengerModel: Model<PassengerDocument>,
     private readonly configService: ConfigService,
+    private membershipService: MembershipService,
     private notificationService: NotificationService,
     private mailService: MailService,
     private chatService: ChatService,
@@ -245,7 +249,7 @@ export class RoutesService {
     const request = new this.requestModel({
       userId: user._id,
       routeId,
-      status: 'pending',
+      status: RequestStatus.PENDING,
       message,
     });
     await request.save();
@@ -322,9 +326,25 @@ export class RoutesService {
         if (!requestUser) throw new NotFoundException('User request not found');
 
         // Xử lý hành động
-        if (action === RequestStatus.ACCEPT) {
+        if (action === "accept") {
+          // Kiểm tra gói thành viên
+          const membership = await this.membershipService.getMembershipInfo(
+            user._id.toString(),
+          );
+          if (!membership || membership.endDate! < new Date()) {
+            throw new BadRequestException('No active membership');
+          }
+          if (
+            membership.remainingRequests <= 0 &&
+            membership.packageType !== MembershipPackageType.PRO
+          ) {
+            throw new BadRequestException(
+              'No remaining accept requests. Please upgrade your membership.',
+            );
+          }
+
           // Cập nhật trạng thái yêu cầu
-          request.status = 'accepted';
+          request.status = RequestStatus.ACCEPTED;
 
           // Giảm số ghế trống
           if (route.seatsAvailable <= 0) {
@@ -332,6 +352,15 @@ export class RoutesService {
           }
           route.seatsAvailable -= 1;
           await route.save({ session });
+
+          // Trừ lượt chấp nhận (nếu không phải gói Pro)
+          if (membership.packageType !== MembershipPackageType.PRO) {
+            await this.userModel.updateOne(
+              { _id: user._id },
+              { $inc: { 'currentMembership.remainingRequests': -1 } },
+              { session },
+            );
+          }
 
           const passenger = new this.passengerModel({
             userId: request.userId,
@@ -369,7 +398,7 @@ export class RoutesService {
             request.routeId,
           );
         } else if (action === 'reject') {
-          request.status = 'rejected';
+          request.status = RequestStatus.REJECTED;
 
           const message = `Your request to join route "${route.name}" has been rejected.`;
           await this.notificationService.createNotification(
@@ -451,7 +480,7 @@ export class RoutesService {
     // Tìm các yêu cầu pending quá hạn
     const expiredRequests = await this.requestModel
       .find({
-        status: 'pending',
+        status: RequestStatus.PENDING,
         createdAt: { $lte: expiryDate },
       })
       .exec();
@@ -462,7 +491,7 @@ export class RoutesService {
         continue;
       }
 
-      request.status = 'rejected';
+      request.status = RequestStatus.REJECTED;
       await request.save();
 
       const message = `Your request to join route "${route.name}" has been automatically rejected due to no response after ${this.REQUEST_EXPIRY_DAYS} days.`;

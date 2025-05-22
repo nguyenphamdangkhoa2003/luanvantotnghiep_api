@@ -25,6 +25,12 @@ import {
   ConversationSchema,
 } from '@/modules/chat/schemas/conversation.schema';
 import { Message, MessageSchema } from '@/modules/chat/schemas/message.schema';
+import { MembershipService } from '@/modules/membership/membership.service';
+import {
+  Membership,
+  MembershipSchema,
+} from '@/modules/membership/schemas/membership.schema';
+import { VnPayService } from '@/modules/vn-pay/vn-pay.service';
 
 @Module({
   imports: [
@@ -50,9 +56,19 @@ import { Message, MessageSchema } from '@/modules/chat/schemas/message.schema';
         name: User.name,
         schema: UserSchema,
       },
+      {
+        name: Membership.name,
+        schema: MembershipSchema,
+      },
     ]),
   ],
   controllers: [RoutesController],
-  providers: [RoutesService, NotificationService, ChatService],
+  providers: [
+    RoutesService,
+    NotificationService,
+    ChatService,
+    MembershipService,
+    VnPayService,
+  ],
 })
 export class RoutesModule {}
