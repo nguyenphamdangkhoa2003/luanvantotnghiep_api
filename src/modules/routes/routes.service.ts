@@ -33,11 +33,13 @@ import { ChatService } from '@/modules/chat/chat.service';
 import { MembershipService } from '@/modules/membership/membership.service';
 import { MembershipPackageType } from '@/common/enums/membership-package-type.enum';
 import { CancelRequestDto } from '@/modules/routes/DTOs/cancel-request.dto';
+import simplify from 'simplify-js';
 
 @Injectable()
 export class RoutesService {
   private readonly mapboxAccessToken: string;
   private readonly REQUEST_EXPIRY_DAYS = 7;
+  private readonly EARTH_RADIUS_METERS = 6378100;
 
   constructor(
     @InjectModel(Route.name) private routeModel: Model<RouteDocument>,
@@ -55,6 +57,15 @@ export class RoutesService {
       'mapbox_access_token',
     );
   }
+  private simplifyPath(
+    coordinates: [number, number][],
+    tolerance: number = 0.001,
+  ): [number, number][] {
+    const points = coordinates.map(([lng, lat]) => ({ x: lng, y: lat }));
+    const simplified = simplify(points, tolerance, true); // true: giữ chất lượng cao
+    return simplified.map((p) => [p.x, p.y]);
+  }
+
   async create(userId: string, createRouteDto: CreateRouteDto): Promise<Route> {
     try {
       const {
@@ -70,6 +81,20 @@ export class RoutesService {
         ...rest
       } = createRouteDto;
 
+      // Rút gọn path nếu có
+      let simplifiedPath = path;
+      if (path?.coordinates) {
+        simplifiedPath = {
+          ...path,
+          coordinates: this.simplifyPath(
+            path.coordinates as [number, number][],
+          ),
+        };
+        console.log(
+          `Path reduced from ${path.coordinates.length} to ${simplifiedPath.coordinates.length} points`,
+        );
+      }
+
       const route = new this.routeModel({
         userId,
         ...rest,
@@ -82,7 +107,7 @@ export class RoutesService {
           coordinates: [endCoords.lng, endCoords.lat],
         },
         waypoints,
-        path,
+        path: simplifiedPath,
         distance,
         duration,
         status: 'active',
@@ -102,6 +127,24 @@ export class RoutesService {
     }
   }
 
+  private metersToRadians(meters: number): number {
+    return meters / this.EARTH_RADIUS_METERS;
+  }
+
+  private buildGeoWithinQuery(
+    coords: { lng: number; lat: number },
+    maxDistance: number,
+  ): any {
+    return {
+      $geoWithin: {
+        $centerSphere: [
+          [coords.lng, coords.lat],
+          this.metersToRadians(maxDistance),
+        ],
+      },
+    };
+  }
+
   async search(searchRouteDto: SearchRouteDto): Promise<Route[]> {
     const {
       startCoords,
@@ -113,106 +156,56 @@ export class RoutesService {
       seatsAvailable,
       priceRange,
       status,
+      page = 0,
+      limit = 10,
     } = searchRouteDto;
+
+    if (
+      priceRange &&
+      priceRange.min &&
+      priceRange.max &&
+      priceRange.min > priceRange.max
+    ) {
+      throw new BadRequestException(
+        'priceRange.min must be less than or equal to priceRange.max',
+      );
+    }
 
     const query: any = {};
     const orConditions: any[] = [];
-
     if (date) {
-      query.startTime = {
-        $gte: new Date(date),
-        $lte: new Date(new Date(date).setHours(23, 59, 59)),
-      };
+      const startOfDay = new Date(date);
+      const endOfDay = new Date(startOfDay.setHours(23, 59, 59));
+      query.startTime = { $gte: startOfDay, $lte: endOfDay };
     }
-
-    const metersToRadians = (meters: number) => meters / 6378100;
-
     if (startCoords) {
+      const geoQuery = this.buildGeoWithinQuery(startCoords, maxDistance);
       orConditions.push(
-        {
-          startPoint: {
-            $geoWithin: {
-              $centerSphere: [
-                [startCoords.lng, startCoords.lat],
-                metersToRadians(maxDistance),
-              ],
-            },
-          },
-        },
-        {
-          waypoints: {
-            $geoWithin: {
-              $centerSphere: [
-                [startCoords.lng, startCoords.lat],
-                metersToRadians(maxDistance),
-              ],
-            },
-          },
-        },
-        {
-          path: {
-            $geoWithin: {
-              $centerSphere: [
-                [startCoords.lng, startCoords.lat],
-                metersToRadians(maxDistance),
-              ],
-            },
-          },
-        },
+        { startPoint: geoQuery },
+        { waypoints: geoQuery },
+        { path: geoQuery },
       );
     }
-
     if (endCoords) {
+      const geoQuery = this.buildGeoWithinQuery(endCoords, maxDistance);
       orConditions.push(
-        {
-          endPoint: {
-            $geoWithin: {
-              $centerSphere: [
-                [endCoords.lng, endCoords.lat],
-                metersToRadians(maxDistance),
-              ],
-            },
-          },
-        },
-        {
-          waypoints: {
-            $geoWithin: {
-              $centerSphere: [
-                [endCoords.lng, endCoords.lat],
-                metersToRadians(maxDistance),
-              ],
-            },
-          },
-        },
-        {
-          path: {
-            $geoWithin: {
-              $centerSphere: [
-                [endCoords.lng, endCoords.lat],
-                metersToRadians(maxDistance),
-              ],
-            },
-          },
-        },
+        { endPoint: geoQuery },
+        { waypoints: geoQuery },
+        { path: geoQuery },
       );
     }
-
     if (orConditions.length > 0) {
-      query.$or = orConditions; // Thay $and bằng $or để tránh xung đột
+      query.$or = orConditions;
     }
-
     if (name) {
-      query.name = { $regex: name, $options: 'i' };
+      query.name = { $regex: `^${name}`, $options: 'i' };
     }
-
     if (frequency) {
       query.frequency = frequency;
     }
-
     if (seatsAvailable !== undefined) {
       query.seatsAvailable = { $gte: seatsAvailable };
     }
-
     if (priceRange) {
       query.price = {};
       if (priceRange.min !== undefined) {
@@ -222,12 +215,17 @@ export class RoutesService {
         query.price.$lte = priceRange.max;
       }
     }
-
     if (status) {
       query.status = status;
     }
 
-    return await this.routeModel.find(query).populate('userId').exec();
+    return await this.routeModel
+      .find(query)
+      .populate('userId')
+      .skip(page * limit)
+      .limit(limit)
+      .lean()
+      .exec();
   }
 
   async requestRoute(
@@ -657,10 +655,10 @@ export class RoutesService {
       const route = request.routeId as Route;
 
       if (!route) {
-        continue; 
+        continue;
       }
 
-      const durationInMs = route.duration * 60 * 1000; 
+      const durationInMs = route.duration * 60 * 1000;
       const expectedCompletionTime = new Date(
         new Date(route.startTime).getTime() + durationInMs,
       );

@@ -6,44 +6,55 @@ import {
   IsDateString,
   Min,
   IsNotEmpty,
+  Max,
 } from 'class-validator';
 
 export class SearchRouteDto {
-  @IsNotEmpty()
-  startCoords: Point;
-
-  @IsNotEmpty()
-  endCoords: Point;
-
-  @IsNumber()
   @IsOptional()
-  @Min(0)
-  maxDistance?: number; // Khoảng cách tối đa (mét)
+  @IsNumber()
+  startCoords?: { lng: number; lat: number };
 
+  @IsOptional()
+  @IsNumber()
+  endCoords?: { lng: number; lat: number };
+
+  @IsOptional()
+  @IsNumber()
+  @Max(10000) // Giới hạn khoảng cách tối đa hợp lý
+  maxDistance?: number;
+
+  @IsOptional()
   @IsDateString()
-  @IsOptional()
-  date?: string; // Ngày khởi hành
+  date?: string;
 
+  @IsOptional()
   @IsString()
-  @IsOptional()
-  name?: string; // Tên tuyến đường (tìm kiếm gần đúng)
+  name?: string;
 
+  @IsOptional()
   @IsString()
-  @IsOptional()
-  frequency?: string; // Tần suất (daily, weekly)
+  frequency?: string;
 
+  @IsOptional()
   @IsNumber()
-  @IsOptional()
   @Min(0)
-  seatsAvailable?: number; // Số ghế trống tối thiểu
+  seatsAvailable?: number;
 
   @IsOptional()
-  priceRange?: {
-    min?: number; // Giá tối thiểu
-    max?: number; // Giá tối đa
-  };
+  priceRange?: { min?: number; max?: number };
 
+  @IsOptional()
   @IsString()
+  status?: string;
+
   @IsOptional()
-  status?: string; // Trạng thái (active, inactive)
+  @IsNumber()
+  @Min(0)
+  page?: number = 0;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  limit?: number = 10;
 }

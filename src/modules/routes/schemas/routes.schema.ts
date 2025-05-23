@@ -89,11 +89,16 @@ export class Route {
   @Prop({ type: Number, default: 0 }) // Lưu chỉ số lộ trình đã chọn
   routeIndex: number;
 }
+
 export const RouteSchema = SchemaFactory.createForClass(Route);
 
-// Tạo index geospatial cho startPoint, endPoint và path để hỗ trợ tìm kiếm không gian
-RouteSchema.index({
-  startPoint: '2dsphere',
-  endPoint: '2dsphere',
-  path: '2dsphere',
-});
+RouteSchema.index({ startPoint: '2dsphere' }); 
+RouteSchema.index({ endPoint: '2dsphere' }); 
+RouteSchema.index({ path: '2dsphere' }); 
+RouteSchema.index({ 'waypoints.coordinates': '2dsphere' }); 
+RouteSchema.index({ name: 'text' });
+RouteSchema.index({ seatsAvailable: 1 }); 
+RouteSchema.index({ price: 1 }); 
+RouteSchema.index({ status: 1 });
+RouteSchema.index({ startTime: 1 }); 
+RouteSchema.index({ userId: 1 });
