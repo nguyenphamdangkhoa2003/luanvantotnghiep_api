@@ -643,4 +643,37 @@ export class RoutesService {
 
     return tripRequest;
   }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async autoCompleteTrips() {
+    const now = new Date();
+
+    // Tìm tất cả các Request có status = 'accepted'
+    const acceptedRequests = (await this.requestModel
+      .find({ status: 'accepted' })
+      .populate('routeId')) as any; // Populate để lấy thông tin Route
+
+    for (const request of acceptedRequests) {
+      const route = request.routeId as Route;
+
+      if (!route) {
+        continue; 
+      }
+
+      const durationInMs = route.duration * 60 * 1000; 
+      const expectedCompletionTime = new Date(
+        new Date(route.startTime).getTime() + durationInMs,
+      );
+
+      if (now > expectedCompletionTime) {
+        await this.requestModel.updateOne(
+          { _id: request._id },
+          {
+            status: 'completed',
+            completedAt: now,
+          },
+        );
+      }
+    }
+  }
 }
