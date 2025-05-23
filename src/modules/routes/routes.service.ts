@@ -525,7 +525,10 @@ export class RoutesService {
   }
 
   public async getRouteById(routeId: string) {
-    const route = await this.routeModel.findById(routeId).exec();
+    const route = await this.routeModel
+      .findById(routeId)
+      .populate('userId')
+      .exec();
     if (!route)
       return new NotFoundException('Route by id: ' + routeId + ' not found');
     return route;

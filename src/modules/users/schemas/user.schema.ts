@@ -163,10 +163,10 @@ export class User {
   };
 
   @Prop({ default: 0 })
-  rating: number;
+  averageRating: number; // Điểm đánh giá trung bình
 
   @Prop({ default: 0 })
-  totalReviews: number;
+  ratingCount: number; // Số lượng đánh giá
 }
 export const UserSchema = SchemaFactory.createForClass(User);
 
