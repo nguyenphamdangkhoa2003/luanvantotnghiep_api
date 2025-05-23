@@ -81,7 +81,7 @@ export class RoutesService {
         ...rest
       } = createRouteDto;
 
-      // Rút gọn path nếu có
+      // Tạo simplifiedPath nếu path tồn tại
       let simplifiedPath = path;
       if (path?.coordinates) {
         simplifiedPath = {
@@ -107,7 +107,8 @@ export class RoutesService {
           coordinates: [endCoords.lng, endCoords.lat],
         },
         waypoints,
-        path: simplifiedPath,
+        path,
+        simplifiedPath,
         distance,
         duration,
         status: 'active',
@@ -147,43 +148,63 @@ export class RoutesService {
 
   async search(searchRouteDto: SearchRouteDto): Promise<Route[]> {
     const {
-      startCoords,
-      endCoords,
-      maxDistance = 5000,
       date,
+      status,
       name,
       frequency,
       seatsAvailable,
       priceRange,
-      status,
+      startCoords,
+      endCoords,
+      maxDistance = 5000,
       page = 0,
       limit = 10,
     } = searchRouteDto;
 
-    if (
-      priceRange &&
-      priceRange.min &&
-      priceRange.max &&
-      priceRange.min > priceRange.max
-    ) {
-      throw new BadRequestException(
-        'priceRange.min must be less than or equal to priceRange.max',
-      );
+    // Validate early
+    if (priceRange) {
+      const { min, max } = priceRange;
+      if (min !== undefined && max !== undefined && min > max) {
+        throw new BadRequestException(
+          'priceRange.min must be less than or equal to priceRange.max',
+        );
+      }
     }
 
     const query: any = {};
-    const orConditions: any[] = [];
+
+    // Simple equality filters first (best for index usage)
+    if (status) query.status = status;
+    if (frequency) query.frequency = frequency;
+
+    // Range filters
     if (date) {
       const startOfDay = new Date(date);
       const endOfDay = new Date(startOfDay.setHours(23, 59, 59));
       query.startTime = { $gte: startOfDay, $lte: endOfDay };
     }
+    if (seatsAvailable !== undefined) {
+      query.seatsAvailable = { $gte: seatsAvailable };
+    }
+    if (priceRange) {
+      query.price = {};
+      if (priceRange.min !== undefined) query.price.$gte = priceRange.min;
+      if (priceRange.max !== undefined) query.price.$lte = priceRange.max;
+    }
+
+    // Text search (if needed)
+    if (name) {
+      query.name = { $regex: `^${name}`, $options: 'i' };
+    }
+
+    // Complex geo queries last
+    const orConditions: any[] = [];
     if (startCoords) {
       const geoQuery = this.buildGeoWithinQuery(startCoords, maxDistance);
       orConditions.push(
         { startPoint: geoQuery },
         { waypoints: geoQuery },
-        { path: geoQuery },
+        { simplifiedPath: geoQuery },
       );
     }
     if (endCoords) {
@@ -191,35 +212,14 @@ export class RoutesService {
       orConditions.push(
         { endPoint: geoQuery },
         { waypoints: geoQuery },
-        { path: geoQuery },
+        { simplifiedPath: geoQuery },
       );
     }
     if (orConditions.length > 0) {
       query.$or = orConditions;
     }
-    if (name) {
-      query.name = { $regex: `^${name}`, $options: 'i' };
-    }
-    if (frequency) {
-      query.frequency = frequency;
-    }
-    if (seatsAvailable !== undefined) {
-      query.seatsAvailable = { $gte: seatsAvailable };
-    }
-    if (priceRange) {
-      query.price = {};
-      if (priceRange.min !== undefined) {
-        query.price.$gte = priceRange.min;
-      }
-      if (priceRange.max !== undefined) {
-        query.price.$lte = priceRange.max;
-      }
-    }
-    if (status) {
-      query.status = status;
-    }
 
-    return await this.routeModel
+    return this.routeModel
       .find(query)
       .populate('userId')
       .skip(page * limit)

@@ -5,7 +5,7 @@ export type RouteDocument = HydratedDocument<Route>;
 
 @Schema()
 export class Waypoint {
-  @Prop({ type: [Number], required: true }) // [longitude, latitude]
+  @Prop({ type: [Number], required: true }) 
   coordinates: [number, number];
 
   @Prop({ type: Number, required: true })
@@ -18,10 +18,10 @@ export class Waypoint {
 @Schema()
 export class Route {
   @Prop({ required: true, ref: 'User' })
-  userId: string; // Người tạo tuyến đường
+  userId: string; 
 
   @Prop({ required: true })
-  name: string; // Tên tuyến đường (VD: "Hà Nội - Hải Phòng")
+  name: string; 
 
   @Prop({
     type: {
@@ -30,11 +30,11 @@ export class Route {
       required: true,
     },
     coordinates: {
-      type: [Number], // [longitude, latitude]
+      type: [Number], 
       required: true,
     },
   })
-  startPoint: { type: string; coordinates: [number, number] }; // Điểm xuất phát
+  startPoint: { type: string; coordinates: [number, number] }; 
 
   @Prop({
     type: {
@@ -43,11 +43,11 @@ export class Route {
       required: true,
     },
     coordinates: {
-      type: [Number], // [longitude, latitude]
+      type: [Number], 
       required: true,
     },
   })
-  endPoint: { type: string; coordinates: [number, number] }; // Điểm đến
+  endPoint: { type: string; coordinates: [number, number] }; 
 
   @Prop({ type: [Waypoint], default: [] })
   waypoints: Waypoint[];
@@ -59,46 +59,53 @@ export class Route {
       required: true,
     },
     coordinates: {
-      type: [[Number]], // [[longitude, latitude], ...]
+      type: [[Number]], 
       required: true,
     },
   })
-  path: { type: string; coordinates: [number, number][] }; // Lộ trình (tọa độ các điểm trên tuyến đường)
+  path: { type: string; coordinates: [number, number][] }; 
 
   @Prop({ required: true })
-  distance: number; // Khoảng cách (km, lấy từ Goong API)
+  distance: number;
 
   @Prop({ required: true })
-  duration: number; // Thời gian di chuyển (phút, lấy từ Goong API)
+  duration: number;
 
   @Prop({ required: true })
-  frequency: string; // Tần suất (VD: "daily", "weekly")
+  frequency: string; 
 
   @Prop({ required: true })
-  startTime: Date; // Thời gian bắt đầu
+  startTime: Date;
 
   @Prop({ required: true })
-  seatsAvailable: number; // Số ghế trống
+  seatsAvailable: number; 
 
   @Prop({ required: true })
-  price: number; // Giá mỗi người
+  price: number; 
 
   @Prop({ default: 'active' })
-  status: string; // Trạng thái tuyến đường (active, inactive)
+  status: string; 
 
-  @Prop({ type: Number, default: 0 }) // Lưu chỉ số lộ trình đã chọn
+  @Prop({ type: Number, default: 0 }) 
   routeIndex: number;
+
+  @Prop({
+    type: { type: String, enum: ['LineString'], required: true },
+    coordinates: { type: [[Number]], required: true },
+  })
+  simplifiedPath: { type: string; coordinates: [number, number][] };
 }
 
 export const RouteSchema = SchemaFactory.createForClass(Route);
 
-RouteSchema.index({ startPoint: '2dsphere' }); 
-RouteSchema.index({ endPoint: '2dsphere' }); 
-RouteSchema.index({ path: '2dsphere' }); 
-RouteSchema.index({ 'waypoints.coordinates': '2dsphere' }); 
+RouteSchema.index({ startPoint: '2dsphere' });
+RouteSchema.index({ endPoint: '2dsphere' });
+RouteSchema.index({ path: '2dsphere' });
+RouteSchema.index({ simplifiedPath: '2dsphere' });
+RouteSchema.index({ 'waypoints.coordinates': '2dsphere' });
 RouteSchema.index({ name: 'text' });
-RouteSchema.index({ seatsAvailable: 1 }); 
-RouteSchema.index({ price: 1 }); 
+RouteSchema.index({ seatsAvailable: 1 });
+RouteSchema.index({ price: 1 });
 RouteSchema.index({ status: 1 });
-RouteSchema.index({ startTime: 1 }); 
+RouteSchema.index({ startTime: 1 });
 RouteSchema.index({ userId: 1 });
