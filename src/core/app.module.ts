@@ -18,6 +18,7 @@ import { UsersModule } from '@/modules/users/users.module';
 import { RoutesModule } from '@/modules/routes/routes.module';
 import { Membership } from '@/modules/membership/schemas/membership.schema';
 import { MembershipModule } from '@/modules/membership/membership.module';
+import { ReviewsModule } from '@/modules/reviews/reviews.module';
 
 const dbLogger = new Logger('Database');
 
@@ -52,6 +53,7 @@ const logDatabaseConnection = () => {
     }),
     AuthModule,
     MembershipModule,
+    ReviewsModule,
     CacheModule.register({
       isGlobal: true,
       ttl: configuration().jwt.refresh.time,

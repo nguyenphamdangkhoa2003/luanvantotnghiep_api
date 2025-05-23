@@ -21,8 +21,11 @@ export class Review {
   @Prop({ default: '' })
   comment: string;
 
-  @Prop({ enum: ['driver', 'passenger'], required: true })
+  @Prop({ enum: ['driver', 'customer'], required: true })
   reviewType: string;
 }
 
 export const ReviewSchema = SchemaFactory.createForClass(Review);
+
+ReviewSchema.index({ reviewer: 1, tripRequest: 1, reviewType: 1 });
+ReviewSchema.index({ reviewee: 1 });

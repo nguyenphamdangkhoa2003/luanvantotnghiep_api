@@ -1,4 +1,90 @@
-import { Injectable } from '@nestjs/common';
+// reviews.service.ts
+import {
+  Review,
+  ReviewDocument,
+} from '@/modules/reviews/schemas/review.schema';
+import { RequestDocument } from '@/modules/routes/schemas/request.schema';
+import { Route } from '@/modules/routes/schemas/routes.schema';
+import {
+  User,
+  UserDocument,
+  UserRole,
+} from '@/modules/users/schemas/user.schema';
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 
 @Injectable()
-export class ReviewsService {}
+export class ReviewsService {
+  constructor(
+    @InjectModel(Review.name) private reviewModel: Model<ReviewDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Request.name) private tripRequestModel: Model<RequestDocument>,
+  ) {}
+
+  async createReview(
+    reviewerId: string,
+    revieweeId: string,
+    tripRequestId: string,
+    rating: number,
+    reviewType: 'customer' | 'driver',
+    comment?: string,
+  ) {
+    const tripRequest = (await this.tripRequestModel
+      .findById(tripRequestId)
+      .populate('routeId')) as any;
+    tripRequest.routeId = tripRequest.routeId as Route;
+    if (!tripRequest || tripRequest.status !== 'completed') {
+      throw new BadRequestException('Invalid or incomplete trip');
+    }
+
+    // Kiểm tra người dùng có tham gia chuyến đi
+    const isValidReviewer =
+      (reviewType === UserRole.DRIVER &&
+        tripRequest.routeId.userId === reviewerId) ||
+      (reviewType === UserRole.CUSTOMER &&
+        tripRequest.userId.toString() === reviewerId);
+    if (!isValidReviewer) {
+      throw new BadRequestException(
+        'You are not authorized to rate this trip.',
+      );
+    }
+
+    // Kiểm tra đã đánh giá chưa
+    const existingReview = await this.reviewModel.findOne({
+      reviewer: reviewerId,
+      tripRequest: tripRequestId,
+      reviewType,
+    });
+    if (existingReview) {
+      throw new BadRequestException('You have rated this trip');
+    }
+
+    const review = await this.reviewModel.create({
+      reviewer: reviewerId,
+      reviewee: revieweeId,
+      tripRequest: tripRequestId,
+      rating,
+      comment,
+      reviewType,
+    });
+
+    // Cập nhật điểm trung bình của người được đánh giá
+    const reviews = await this.reviewModel.find({ reviewee: revieweeId });
+    const averageRating =
+      reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+    await this.userModel.findByIdAndUpdate(revieweeId, {
+      averageRating,
+      ratingCount: reviews.length,
+    });
+
+    return review;
+  }
+
+  async getReviewsByUser(userId: string) {
+    return this.reviewModel
+      .find({ reviewee: userId })
+      .populate('reviewer', 'name')
+      .populate('tripRequest', 'startLocation endLocation');
+  }
+}

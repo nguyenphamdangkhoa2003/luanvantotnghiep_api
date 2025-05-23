@@ -1,3 +1,4 @@
+import { RequestStatus } from '@/common/enums/request-status.enum';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
@@ -11,8 +12,12 @@ export class Request {
   @Prop({ required: true, ref: 'Route' })
   routeId: string; // Tuyến đường được yêu cầu
 
-  @Prop({ required: true, default: 'pending' })
-  status: string; // Trạng thái: pending, accepted, rejected
+  @Prop({
+    required: true,
+    enum: Object.values(RequestStatus),
+    default: 'pending',
+  })
+  status: string;
 
   @Prop()
   message?: string; // Tin nhắn kèm theo (tùy chọn)
