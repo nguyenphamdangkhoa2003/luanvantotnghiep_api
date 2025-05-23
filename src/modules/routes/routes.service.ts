@@ -611,4 +611,36 @@ export class RoutesService {
 
     return request;
   }
+
+  async completeTrip(tripRequestId: string, userId: string) {
+    const tripRequest = (await this.requestModel
+      .findById(tripRequestId)
+      .populate('routeId')) as any;
+
+    if (!tripRequest) {
+      throw new BadRequestException('Yêu cầu chuyến đi không tồn tại');
+    }
+    tripRequest.routeId = tripRequest.routeId as Route;
+
+    if (
+      tripRequest.userId.toString() !== userId &&
+      tripRequest.routeId.userId.toString() !== userId
+    ) {
+      throw new BadRequestException(
+        'You are not authorized to confirm this trip.',
+      );
+    }
+
+    if (tripRequest.status !== 'accepted') {
+      throw new BadRequestException(
+        'Chuyến đi chưa được chấp nhận hoặc đã hoàn thành',
+      );
+    }
+
+    tripRequest.status = 'completed';
+    tripRequest.completedAt = new Date();
+    await tripRequest.save();
+
+    return tripRequest;
+  }
 }

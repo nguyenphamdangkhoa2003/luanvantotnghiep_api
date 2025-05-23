@@ -7,6 +7,7 @@ import {
   Req,
   UseGuards,
   Param,
+  Patch,
 } from '@nestjs/common';
 import { RoutesService } from './routes.service';
 import { CreateRouteDto } from '@/modules/routes/DTOs/create-route.dto';
@@ -74,5 +75,10 @@ export class RoutesController {
   async getRouteById(@Param('routeId') routeId: string) {
     const route = this.routesService.getRouteById(routeId);
     return route;
+  }
+
+  @Patch(':id/complete')
+  async completeTrip(@Param('id') id: string, @Req() req: AuthRequest) {
+    return this.routesService.completeTrip(id, req.user._id);
   }
 }
