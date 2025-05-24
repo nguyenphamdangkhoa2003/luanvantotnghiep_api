@@ -7,6 +7,7 @@ import { CipherKey } from 'crypto';
 import * as passport from 'passport';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
+import * as bodyParser from 'body-parser'; // Thêm body-parser
 
 const APP_NAME = 'XeShare API';
 const logger = new Logger(APP_NAME, { timestamp: true });
@@ -19,6 +20,11 @@ async function bootstrap() {
         logLevels: ['log'],
       }),
     });
+
+    // Thêm cấu hình body-parser để tăng giới hạn kích thước body
+    app.use(bodyParser.json({ limit: '50mb' }));
+    app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+
     app.use(cookieParser());
     app.enableCors({
       origin: 'http://localhost:3001',
