@@ -125,8 +125,6 @@ export class AuthController {
   }
 
   @Get('profile')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
   getProfile(@Req() request: Request) {
     if (!request.user) {
       throw new UnauthorizedException(
