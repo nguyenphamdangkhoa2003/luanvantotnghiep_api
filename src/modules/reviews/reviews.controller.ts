@@ -31,8 +31,13 @@ export class ReviewsController {
     );
   }
 
-  @Get('user/:userId')
-  async getReviewsByUser(@Param('userId') userId: string) {
-    return this.reviewsService.getReviewsByUser(userId);
+  @Get('given/:userId')
+  async getReviewsGivenByUser(@Param('userId') userId: string) {
+    return this.reviewsService.getReviewsGivenByUser(userId);
+  }
+
+  @Get('received/:userId')
+  async getReviewsReceivedByUser(@Param('userId') userId: string) {
+    return this.reviewsService.getReviewsReceivedByUser(userId);
   }
 }

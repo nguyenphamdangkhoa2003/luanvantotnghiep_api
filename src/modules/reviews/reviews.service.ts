@@ -81,10 +81,19 @@ export class ReviewsService {
     return review;
   }
 
-  async getReviewsByUser(userId: string) {
+  async getReviewsGivenByUser(userId: string) {
+    return this.reviewModel
+      .find({ reviewer: userId })
+      .populate('reviewee', 'name')
+      .populate('tripRequest', 'startLocation endLocation')
+      .exec();
+  }
+
+  async getReviewsReceivedByUser(userId: string) {
     return this.reviewModel
       .find({ reviewee: userId })
       .populate('reviewer', 'name')
-      .populate('tripRequest', 'startLocation endLocation');
+      .populate('tripRequest', 'startLocation endLocation')
+      .exec();
   }
 }

@@ -153,101 +153,108 @@ export class RoutesService {
   }
 
   async search(searchRouteDto: SearchRouteDto): Promise<Route[]> {
-    const {
-      startCoords,
-      endCoords,
-      maxDistance = 5000,
-      date,
-      name,
-      frequency,
-      seatsAvailable,
-      priceRange,
-      status,
-    } = searchRouteDto;
-
-    const buildQuery = () => {
-      const query: any = {};
-
-      if (name) {
-        query.name = { $regex: name, $options: 'i' };
-      }
-
-      if (frequency) {
-        query.frequency = frequency;
-      }
-
-      if (seatsAvailable !== undefined) {
-        query.seatsAvailable = { $gte: seatsAvailable };
-      }
-
-      if (priceRange) {
-        query.price = {};
-        if (priceRange.min !== undefined) {
-          query.price.$gte = priceRange.min;
-        }
-        if (priceRange.max !== undefined) {
-          query.price.$lte = priceRange.max;
-        }
-      }
-
-      if (status) {
-        query.status = status;
-      }
-
-      if (date) {
-        query.startTime = {
-          $gte: new Date(date),
-          $lte: new Date(new Date(date).setHours(23, 59, 59)),
-        };
-      }
-
-      return query;
-    };
-
-    const buildGeoConditions = () => {
-      const orConditions: any[] = [];
-
-      const createGeoWithinCondition = (coords: {
-        lng: number;
-        lat: number;
-      }) => ({
-        $geoWithin: {
-          $centerSphere: [
-            [coords.lng, coords.lat],
-            this.metersToRadians(maxDistance),
-          ],
-        },
-      });
-
-      if (startCoords) {
-        const geoCondition = createGeoWithinCondition(startCoords);
-        orConditions.push(
-          { startPoint: geoCondition },
-          { waypoints: geoCondition },
-          { simplifiedPath: geoCondition },
-        );
-      }
-
-      if (endCoords) {
-        const geoCondition = createGeoWithinCondition(endCoords);
-        orConditions.push(
-          { endPoint: geoCondition },
-          { waypoints: geoCondition },
-          { simplifiedPath: geoCondition },
-        );
-      }
-
-      return orConditions;
-    };
-
-    const query = buildQuery();
-    const geoConditions = buildGeoConditions();
+    const query = this.buildQuery(searchRouteDto);
+    const geoConditions = this.buildGeoConditions(searchRouteDto);
 
     if (geoConditions.length > 0) {
       query.$or = geoConditions;
     }
 
     return await this.routeModel.find(query).populate('userId').exec();
+  }
+
+  private buildQuery({
+    name,
+    frequency,
+    seatsAvailable,
+    priceRange,
+    status,
+    date,
+  }: SearchRouteDto): any {
+    const query: any = {};
+
+    if (name) {
+      query.name = { $regex: name, $options: 'i' };
+    }
+
+    if (frequency) {
+      query.frequency = frequency;
+    }
+
+    if (seatsAvailable !== undefined) {
+      query.seatsAvailable = { $gte: seatsAvailable };
+    }
+
+    if (priceRange) {
+      query.price = {};
+      if (priceRange.min !== undefined) {
+        query.price.$gte = priceRange.min;
+      }
+      if (priceRange.max !== undefined) {
+        query.price.$lte = priceRange.max;
+      }
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (date) {
+      query.startTime = {
+        $gte: new Date(date),
+        $lte: new Date(new Date(date).setHours(23, 59, 59)),
+      };
+    }
+
+    return query;
+  }
+
+  private buildGeoConditions({
+    startCoords,
+    endCoords,
+    maxDistance = 5000,
+  }: SearchRouteDto): any[] {
+    const orConditions: any[] = [];
+
+    if (startCoords) {
+      const geoCondition = this.createGeoWithinCondition(
+        startCoords,
+        maxDistance,
+      );
+      orConditions.push(
+        { startPoint: geoCondition },
+        { waypoints: geoCondition },
+        { simplifiedPath: geoCondition },
+      );
+    }
+
+    if (endCoords) {
+      const geoCondition = this.createGeoWithinCondition(
+        endCoords,
+        maxDistance,
+      );
+      orConditions.push(
+        { endPoint: geoCondition },
+        { waypoints: geoCondition },
+        { simplifiedPath: geoCondition },
+      );
+    }
+
+    return orConditions;
+  }
+
+  private createGeoWithinCondition(
+    coords: { lng: number; lat: number },
+    maxDistance: number,
+  ): any {
+    return {
+      $geoWithin: {
+        $centerSphere: [
+          [coords.lng, coords.lat],
+          this.metersToRadians(maxDistance),
+        ],
+      },
+    };
   }
 
   async requestRoute(
