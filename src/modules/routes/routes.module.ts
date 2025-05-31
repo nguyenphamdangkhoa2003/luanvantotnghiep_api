@@ -31,6 +31,7 @@ import {
   MembershipSchema,
 } from '@/modules/membership/schemas/membership.schema';
 import { VnPayService } from '@/modules/vn-pay/vn-pay.service';
+import { Package, PackageSchema } from '@/modules/membership/schemas/package.schema';
 
 @Module({
   imports: [
@@ -43,6 +44,10 @@ import { VnPayService } from '@/modules/vn-pay/vn-pay.service';
       {
         name: Conversation.name,
         schema: ConversationSchema,
+      },
+      {
+        name: Package.name,
+        schema: PackageSchema,
       },
       {
         name: Message.name,

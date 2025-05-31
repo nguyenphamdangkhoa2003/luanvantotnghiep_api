@@ -9,7 +9,7 @@ export class Membership {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ required: true, enum: ['Basic', 'Premium', 'Pro'] })
+  @Prop({ required: true})
   packageType: string;
 
   @Prop({ required: true })
@@ -33,19 +33,4 @@ export class Membership {
 
 export const MembershipSchema = SchemaFactory.createForClass(Membership);
 
-// Update User schema to include membership info
-@Schema({ timestamps: true })
-export class User extends Document {
-  // Existing fields: username, email, etc.
 
-  @Prop({
-    type: { packageType: String, remainingRequests: Number, endDate: Date },
-  })
-  currentMembership: {
-    packageType: string;
-    remainingRequests: number;
-    endDate: Date;
-  };
-}
-
-export const UserSchema = SchemaFactory.createForClass(User);

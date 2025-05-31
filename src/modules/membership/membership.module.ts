@@ -8,6 +8,10 @@ import {
   MembershipSchema,
 } from '@/modules/membership/schemas/membership.schema';
 import { User, UserSchema } from '@/modules/users/schemas/user.schema';
+import {
+  Package,
+  PackageSchema,
+} from '@/modules/membership/schemas/package.schema';
 
 @Module({
   imports: [
@@ -19,6 +23,10 @@ import { User, UserSchema } from '@/modules/users/schemas/user.schema';
       {
         name: User.name,
         schema: UserSchema,
+      },
+      {
+        name: Package.name,
+        schema: PackageSchema,
       },
     ]),
   ],

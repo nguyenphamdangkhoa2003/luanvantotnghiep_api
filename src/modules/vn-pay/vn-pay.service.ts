@@ -61,7 +61,6 @@ export class VnPayService {
   }
 
   async verifyCallback(data: any) {
-    console.log('Callback data:', data);
     const secureHash = data.vnp_SecureHash;
     delete data.vnp_SecureHash;
 

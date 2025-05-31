@@ -1,14 +1,19 @@
+import { CreatePackageDto } from '@/modules/membership/DTOs/create-package.dto';
 import { PurchaseMembershipDto } from '@/modules/membership/DTOs/purchase-membership.dto';
+import { UpdatePackageDto } from '@/modules/membership/DTOs/update-package.dto';
+
 import {
   Membership,
   MembershipDocument,
 } from '@/modules/membership/schemas/membership.schema';
+import { Package, PackageDocument } from '@/modules/membership/schemas/package.schema';
 import { User, UserDocument } from '@/modules/users/schemas/user.schema';
 import { VnPayService } from '@/modules/vn-pay/vn-pay.service';
 import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -18,25 +23,97 @@ export class MembershipService {
   constructor(
     @InjectModel(Membership.name)
     private membershipModel: Model<MembershipDocument>,
-    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Package.name)
+    private packageModel: Model<PackageDocument>,
+    @InjectModel(User.name)
+    private userModel: Model<UserDocument>,
     private vnPayService: VnPayService,
   ) {}
 
-  private packageConfig = {
-    Basic: { acceptRequests: 50, price: 100000, durationDays: 30 },
-    Premium: { acceptRequests: 200, price: 300000, durationDays: 30 },
-    Pro: { acceptRequests: Infinity, price: 1000000, durationDays: 30 },
-  };
+  // Admin: Get all packages
+  async getAllPackages() {
+    return this.packageModel.find().exec();
+  }
+
+  // Admin: Create new package
+  async createPackage(dto: CreatePackageDto) {
+    const existingPackage = await this.packageModel
+      .findOne({ name: dto.name })
+      .exec();
+    if (existingPackage) {
+      throw new BadRequestException('Package name already exists');
+    }
+
+    const newPackage = await this.packageModel.create({
+      name: dto.name,
+      acceptRequests: dto.acceptRequests,
+      price: dto.price,
+      durationDays: dto.durationDays,
+    });
+
+    return newPackage;
+  }
+
+  // Admin: Update package
+  async updatePackage(packageName: string, dto: UpdatePackageDto) {
+    const packageDoc = await this.packageModel
+      .findOne({ name: packageName })
+      .exec();
+    if (!packageDoc) {
+      throw new NotFoundException('Package not found');
+    }
+
+    const updatedPackage = await this.packageModel
+      .findOneAndUpdate(
+        { name: packageName },
+        { $set: { ...dto } },
+        { new: true },
+      )
+      .exec();
+
+    return updatedPackage;
+  }
+
+  // Admin: Delete package
+  async deletePackage(packageName: string) {
+    const packageDoc = await this.packageModel
+      .findOne({ name: packageName })
+      .exec();
+    if (!packageDoc) {
+      throw new NotFoundException('Package not found');
+    }
+
+    // Check if any active memberships use this package
+    const activeMemberships = await this.membershipModel.countDocuments({
+      packageType: packageName,
+      status: 'active',
+    });
+
+    if (activeMemberships > 0) {
+      throw new ForbiddenException(
+        'Cannot delete package with active memberships',
+      );
+    }
+
+    await this.packageModel
+      .updateOne({ name: packageName }, { $set: { isActive: false } })
+      .exec();
+
+    return { message: 'Package deleted successfully' };
+  }
 
   async purchaseMembership(userId: string, dto: PurchaseMembershipDto) {
-    const config = this.packageConfig[dto.packageType];
-    if (!config) {
+    const packageDoc = await this.packageModel
+      .findOne({
+        name: dto.packageType,
+      })
+      .exec();
+    if (!packageDoc) {
       throw new BadRequestException('Invalid package type');
     }
 
-    // Create VNPay payment URL
     const paymentUrl = await this.vnPayService.createPaymentUrl({
-      amount: config.price,
+      amount: packageDoc.price,
       orderId: `MEMBERSHIP_${userId}_${Date.now()}`,
       orderInfo: `Purchase ${dto.packageType} membership`,
       userId,
@@ -50,36 +127,43 @@ export class MembershipService {
     if (!isValid) {
       throw new BadRequestException('Invalid payment callback');
     }
+
     const txnRefParts = vnpayData.vnp_TxnRef.split('_');
     const userId = txnRefParts[1];
     const packageType = vnpayData.vnp_OrderInfo.match(
       /Purchase (\w+) membership/,
     )[1];
-    const config = this.packageConfig[packageType];
+
+    const packageDoc = await this.packageModel
+      .findOne({
+        name: packageType,
+      })
+      .exec();
+    if (!packageDoc) {
+      throw new BadRequestException('Invalid package type');
+    }
 
     const startDate = new Date();
     const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + config.durationDays);
+    endDate.setDate(startDate.getDate() + packageDoc.durationDays);
 
-    // Save membership
     const membership = await this.membershipModel.create({
       userId,
       packageType,
-      acceptRequests: config.acceptRequests,
-      price: config.price,
-      durationDays: config.durationDays,
+      acceptRequests: packageDoc.acceptRequests,
+      price: packageDoc.price,
+      durationDays: packageDoc.durationDays,
       startDate,
       endDate,
       status: 'active',
     });
 
-    // Update user
     await this.userModel.updateOne(
       { _id: userId },
       {
         currentMembership: {
           packageType,
-          remainingRequests: config.acceptRequests,
+          remainingRequests: packageDoc.acceptRequests,
           endDate,
         },
       },
@@ -89,7 +173,7 @@ export class MembershipService {
   }
 
   async getMembershipInfo(userId: string) {
-    const user = await this.userModel.findById(userId);
+    const user = await this.userModel.findById(userId).exec();
     return user?.currentMembership || null;
   }
 }
