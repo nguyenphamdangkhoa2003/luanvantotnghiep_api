@@ -13,6 +13,7 @@ import { CreateRouteDto } from '@/modules/routes/DTOs/create-route.dto';
 import { SearchRouteDto } from '@/modules/routes/DTOs/search-route.dto';
 import { ConfigService } from '@nestjs/config';
 import { AdvancedSearchRouteDto } from '@/modules/routes/DTOs/advanced-search-route.dto';
+import { faker } from '@faker-js/faker';
 import {
   Request,
   RequestDocument,
@@ -35,13 +36,83 @@ import { MembershipPackageType } from '@/common/enums/membership-package-type.en
 import { CancelRequestDto } from '@/modules/routes/DTOs/cancel-request.dto';
 import simplify from 'simplify-js';
 import * as turf from '@turf/turf';
-
+interface Location {
+  name: string;
+  coordinates: [number, number]; // Tuple thay vì number[]
+}
 @Injectable()
 export class RoutesService {
   private readonly mapboxAccessToken: string;
   private readonly REQUEST_EXPIRY_DAYS = 7;
   private readonly EARTH_RADIUS_METERS = 6378100;
-
+  private readonly locations: Location[] = [
+    { name: 'Hà Nội', coordinates: [105.8342, 21.0278] },
+    { name: 'TP Hồ Chí Minh', coordinates: [106.6297, 10.8231] },
+    { name: 'Đà Nẵng', coordinates: [108.2068, 16.0472] },
+    { name: 'Huế', coordinates: [107.5898, 16.4637] },
+    { name: 'Cần Thơ', coordinates: [105.7747, 10.0386] },
+    { name: 'Nha Trang', coordinates: [109.1942, 12.2451] },
+    { name: 'Hải Phòng', coordinates: [106.6881, 20.8449] },
+    { name: 'Vũng Tàu', coordinates: [107.0843, 10.346] },
+    { name: 'Đà Lạt', coordinates: [108.4419, 11.9404] },
+    { name: 'Quảng Ninh', coordinates: [107.0571, 20.9517] },
+    { name: 'An Giang', coordinates: [105.4352, 10.5215] },
+    { name: 'Bà Rịa - Vũng Tàu', coordinates: [107.1688, 10.4963] },
+    { name: 'Bắc Giang', coordinates: [106.1947, 21.2731] },
+    { name: 'Bắc Kạn', coordinates: [105.8403, 22.147] },
+    { name: 'Bạc Liêu', coordinates: [105.7244, 9.294] },
+    { name: 'Bắc Ninh', coordinates: [106.0502, 21.1861] },
+    { name: 'Bến Tre', coordinates: [106.3756, 10.2415] },
+    { name: 'Bình Định', coordinates: [109.2335, 13.782] },
+    { name: 'Bình Dương', coordinates: [106.677, 11.152] },
+    { name: 'Bình Phước', coordinates: [106.8934, 11.5379] },
+    { name: 'Bình Thuận', coordinates: [108.1021, 10.9289] },
+    { name: 'Cà Mau', coordinates: [105.1524, 9.1768] },
+    { name: 'Cao Bằng', coordinates: [106.2524, 22.666] },
+    { name: 'Đắk Lắk', coordinates: [108.2378, 12.71] },
+    { name: 'Đắk Nông', coordinates: [107.6097, 12.264] },
+    { name: 'Điện Biên', coordinates: [103.0167, 21.386] },
+    { name: 'Đồng Nai', coordinates: [107.1007, 10.9574] },
+    { name: 'Đồng Tháp', coordinates: [105.6877, 10.4938] },
+    { name: 'Gia Lai', coordinates: [108.269, 13.8079] },
+    { name: 'Hà Giang', coordinates: [104.9836, 22.8233] },
+    { name: 'Hà Nam', coordinates: [105.9122, 20.5835] },
+    { name: 'Hà Tĩnh', coordinates: [105.9057, 18.3428] },
+    { name: 'Hải Dương', coordinates: [106.333, 20.941] },
+    { name: 'Hậu Giang', coordinates: [105.6413, 9.7579] },
+    { name: 'Hòa Bình', coordinates: [105.3383, 20.8172] },
+    { name: 'Hưng Yên', coordinates: [106.0672, 20.8526] },
+    { name: 'Khánh Hòa', coordinates: [109.1927, 12.2584] },
+    { name: 'Kiên Giang', coordinates: [105.1259, 10.0124] },
+    { name: 'Kon Tum', coordinates: [108.0133, 14.6612] },
+    { name: 'Lai Châu', coordinates: [103.4371, 22.3857] },
+    { name: 'Lâm Đồng', coordinates: [108.4587, 11.5753] },
+    { name: 'Lạng Sơn', coordinates: [106.6291, 21.8537] },
+    { name: 'Lào Cai', coordinates: [103.9743, 22.4832] },
+    { name: 'Long An', coordinates: [106.4111, 10.6987] },
+    { name: 'Nam Định', coordinates: [106.1753, 20.42] },
+    { name: 'Nghệ An', coordinates: [105.6927, 19.2342] },
+    { name: 'Ninh Bình', coordinates: [105.9747, 20.2581] },
+    { name: 'Ninh Thuận', coordinates: [108.9929, 11.6739] },
+    { name: 'Phú Thọ', coordinates: [105.2221, 21.3992] },
+    { name: 'Phú Yên', coordinates: [109.296, 13.0882] },
+    { name: 'Quảng Bình', coordinates: [106.6222, 17.4651] },
+    { name: 'Quảng Nam', coordinates: [108.019, 15.879] },
+    { name: 'Quảng Ngãi', coordinates: [108.7992, 15.1214] },
+    { name: 'Quảng Trị', coordinates: [107.2007, 16.7943] },
+    { name: 'Sóc Trăng', coordinates: [105.974, 9.6025] },
+    { name: 'Sơn La', coordinates: [103.909, 21.327] },
+    { name: 'Tây Ninh', coordinates: [106.1314, 11.31] },
+    { name: 'Thái Bình', coordinates: [106.34, 20.5381] },
+    { name: 'Thái Nguyên', coordinates: [105.8252, 21.5672] },
+    { name: 'Thanh Hóa', coordinates: [105.7799, 19.8072] },
+    { name: 'Tiền Giang', coordinates: [106.3602, 10.4493] },
+    { name: 'Trà Vinh', coordinates: [106.3439, 9.9347] },
+    { name: 'Tuyên Quang', coordinates: [105.2613, 21.8194] },
+    { name: 'Vĩnh Long', coordinates: [105.972, 10.2537] },
+    { name: 'Vĩnh Phúc', coordinates: [105.5987, 21.3089] },
+    { name: 'Yên Bái', coordinates: [104.8752, 21.7049] },
+  ];
   constructor(
     @InjectModel(Route.name) private routeModel: Model<RouteDocument>,
     @InjectModel(Request.name) private requestModel: Model<RequestDocument>,
@@ -57,6 +128,7 @@ export class RoutesService {
     this.mapboxAccessToken = configService.getOrThrow<string>(
       'mapbox_access_token',
     );
+    console.log(this.mapboxAccessToken);
   }
   private simplifyPath(
     coordinates: [number, number][],
@@ -158,128 +230,143 @@ export class RoutesService {
     const geoConditions = this.buildGeoConditions(searchRouteDto);
 
     if (geoConditions.length > 0) {
-        // Nếu có cả startCoords và endCoords, dùng $and; nếu không, dùng $or
-        if (searchRouteDto.startCoords && searchRouteDto.endCoords) {
-            query.$and = geoConditions; // Yêu cầu cả hai nhóm điều kiện
-        } else {
-            query.$or = geoConditions; // Chỉ cần một nhóm điều kiện
-        }
+      // Nếu có cả startCoords và endCoords, dùng $and; nếu không, dùng $or
+      if (searchRouteDto.startCoords && searchRouteDto.endCoords) {
+        query.$and = geoConditions; // Yêu cầu cả hai nhóm điều kiện
+      } else {
+        query.$or = geoConditions; // Chỉ cần một nhóm điều kiện
+      }
     }
 
     return await this.routeModel.find(query).populate('userId').exec();
-}
+  }
 
-private buildQuery({
+  private buildQuery({
     name,
     frequency,
     seatsAvailable,
     priceRange,
     status,
-    date
-}: SearchRouteDto): any {
+    date,
+  }: SearchRouteDto): any {
     const query: any = {};
 
     if (name) {
-        query.name = { $regex: name, $options: 'i' };
+      query.name = { $regex: name, $options: 'i' };
     }
 
     if (frequency) {
-        query.frequency = frequency;
+      query.frequency = frequency;
     }
 
     if (seatsAvailable !== undefined) {
-        query.seatsAvailable = { $gte: seatsAvailable };
+      query.seatsAvailable = { $gte: seatsAvailable };
     }
 
     if (priceRange) {
-        query.price = {};
-        if (priceRange.min !== undefined) {
-            query.price.$gte = priceRange.min;
-        }
-        if (priceRange.max !== undefined) {
-            query.price.$lte = priceRange.max;
-        }
+      query.price = {};
+      if (priceRange.min !== undefined) {
+        query.price.$gte = priceRange.min;
+      }
+      if (priceRange.max !== undefined) {
+        query.price.$lte = priceRange.max;
+      }
     }
 
     if (status) {
-        query.status = status;
+      query.status = status;
     }
 
     if (date) {
-        query.startTime = {
-            $gte: new Date(date),
-            $lte: new Date(new Date(date).setHours(23, 59, 59)),
-        };
+      query.startTime = {
+        $gte: new Date(date),
+        $lte: new Date(new Date(date).setHours(23, 59, 59)),
+      };
     }
 
     return query;
-}
+  }
 
-private buildGeoConditions({
+  private buildGeoConditions({
     startCoords,
     endCoords,
-    maxDistance = 5000
-}: SearchRouteDto): any[] {
+    maxDistance = 5000,
+  }: SearchRouteDto): any[] {
     const geoConditions: any[] = [];
 
     // Điều kiện cho startCoords
     if (startCoords) {
-        const geoWithinCondition = this.createGeoWithinCondition(startCoords, maxDistance);
-        const geoIntersectsCondition = this.createGeoIntersectsCondition(startCoords, maxDistance);
-        const startConditions = {
-            $or: [
-                { startPoint: geoWithinCondition },
-                { 'waypoints.coordinates': geoWithinCondition },
-                { simplifiedPath: geoIntersectsCondition }
-            ]
-        };
-        geoConditions.push(startConditions);
+      const geoWithinCondition = this.createGeoWithinCondition(
+        startCoords,
+        maxDistance,
+      );
+      const geoIntersectsCondition = this.createGeoIntersectsCondition(
+        startCoords,
+        maxDistance,
+      );
+      const startConditions = {
+        $or: [
+          { startPoint: geoWithinCondition },
+          { 'waypoints.coordinates': geoWithinCondition },
+          { simplifiedPath: geoIntersectsCondition },
+        ],
+      };
+      geoConditions.push(startConditions);
     }
 
     // Điều kiện cho endCoords
     if (endCoords) {
-        const geoWithinCondition = this.createGeoWithinCondition(endCoords, maxDistance);
-        const geoIntersectsCondition = this.createGeoIntersectsCondition(endCoords, maxDistance);
-        const endConditions = {
-            $or: [
-                { endPoint: geoWithinCondition },
-                { 'waypoints.coordinates': geoWithinCondition },
-                { simplifiedPath: geoIntersectsCondition }
-            ]
-        };
-        geoConditions.push(endConditions);
+      const geoWithinCondition = this.createGeoWithinCondition(
+        endCoords,
+        maxDistance,
+      );
+      const geoIntersectsCondition = this.createGeoIntersectsCondition(
+        endCoords,
+        maxDistance,
+      );
+      const endConditions = {
+        $or: [
+          { endPoint: geoWithinCondition },
+          { 'waypoints.coordinates': geoWithinCondition },
+          { simplifiedPath: geoIntersectsCondition },
+        ],
+      };
+      geoConditions.push(endConditions);
     }
 
     return geoConditions;
-}
+  }
 
-private createGeoWithinCondition(
+  private createGeoWithinCondition(
     coords: { lng: number; lat: number },
-    maxDistance: number
-): any {
+    maxDistance: number,
+  ): any {
     return {
-        $geoWithin: {
-            $centerSphere: [
-                [coords.lng, coords.lat],
-                this.metersToRadians(maxDistance)
-            ]
-        }
+      $geoWithin: {
+        $centerSphere: [
+          [coords.lng, coords.lat],
+          this.metersToRadians(maxDistance),
+        ],
+      },
     };
-}
+  }
 
-private createGeoIntersectsCondition(
+  private createGeoIntersectsCondition(
     coords: { lng: number; lat: number },
-    maxDistance: number
-): any {
+    maxDistance: number,
+  ): any {
     const center = [coords.lng, coords.lat];
     const radius = maxDistance / 1000; // Chuyển sang km
-    const circle = turf.circle(center, radius, { steps: 64, units: 'kilometers' });
+    const circle = turf.circle(center, radius, {
+      steps: 64,
+      units: 'kilometers',
+    });
     return {
-        $geoIntersects: {
-            $geometry: circle.geometry // GeoJSON Polygon
-        }
+      $geoIntersects: {
+        $geometry: circle.geometry, // GeoJSON Polygon
+      },
     };
-}
+  }
   async requestRoute(
     user: User,
     requestRouteDto: RequestRouteDto,
@@ -725,5 +812,156 @@ private createGeoIntersectsCondition(
         );
       }
     }
+  }
+
+  //================================ *** SEED DATA *** ================================
+
+  private async getRouteData(
+    start: [number, number],
+    end: [number, number],
+    waypoints: [number, number][] = [],
+    retries = 3,
+  ): Promise<{ distance: number; duration: number; path: [number, number][] }> {
+    if (!this.mapboxAccessToken) {
+      throw new Error('Mapbox Access Token is missing');
+    }
+
+    const coordinates = [start, ...waypoints, end]
+      .map((coord) => `${coord[0]},${coord[1]}`)
+      .join(';');
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&access_token=${this.mapboxAccessToken}`;
+
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await axios.get(url);
+        const route = response.data.routes[0];
+        if (!route) {
+          throw new Error('No routes found in Mapbox response');
+        }
+        return {
+          distance: route.distance / 1000, // km
+          duration: route.duration, // giây
+          path: route.geometry.coordinates as [number, number][],
+        };
+      } catch (error) {
+        if (error.response?.status === 401) {
+          throw new Error(
+            'Mapbox API: Unauthorized - Invalid or missing access token',
+          );
+        }
+        if (error.response?.status === 429 && i < retries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+        throw new Error(`Mapbox API error: ${error.message}`);
+      }
+    }
+    throw new Error('Mapbox API: Max retries reached');
+  }
+
+  private async generateRoute(index: number): Promise<Route> {
+    const startLocation = this.getRandomItem(this.locations);
+    let endLocation = this.getRandomItem(this.locations);
+    while (endLocation.name === startLocation.name) {
+      endLocation = this.getRandomItem(this.locations);
+    }
+
+    // Chọn 0-2 waypoints ngẫu nhiên
+    const waypointCount = faker.number.int({ min: 0, max: 2 });
+    const waypointLocations: Location[] = [];
+    for (let i = 0; i < waypointCount; i++) {
+      let waypoint = this.getRandomItem(this.locations);
+      while (
+        waypoint.name === startLocation.name ||
+        waypoint.name === endLocation.name ||
+        waypointLocations.some((w) => w.name === waypoint.name)
+      ) {
+        waypoint = this.getRandomItem(this.locations);
+      }
+      waypointLocations.push(waypoint);
+    }
+
+    // Lấy dữ liệu từ Mapbox
+    const { distance, duration, path } = await this.getRouteData(
+      startLocation.coordinates,
+      endLocation.coordinates,
+      waypointLocations.map((w) => w.coordinates),
+    );
+
+    // Tạo waypoints cho schema
+    let totalDistance = 0;
+    const waypointData = waypointLocations.map((loc, idx) => {
+      totalDistance +=
+        idx === 0
+          ? distance / (waypointCount + 1)
+          : distance / (waypointCount + 1);
+      return {
+        coordinates: loc.coordinates,
+        distance: totalDistance,
+        name: loc.name,
+      };
+    });
+
+    // Sinh các giá trị khác
+    const price = Math.round(
+      distance * faker.number.int({ min: 500, max: 1000 }),
+    ); // 500-1000 VND/km
+    const seatsAvailable = faker.number.int({ min: 10, max: 50 });
+    const frequency = faker.helpers.arrayElement([
+      'daily',
+      'weekly',
+      'monthly',
+    ]);
+    const startTime = faker.date.soon({ days: 30 });
+
+    return {
+      userId: faker.database.mongodbObjectId(),
+      name: `${startLocation.name} - ${endLocation.name}`,
+      startPoint: { type: 'Point', coordinates: startLocation.coordinates },
+      endPoint: { type: 'Point', coordinates: endLocation.coordinates },
+      waypoints: waypointData,
+      path: { type: 'LineString', coordinates: path },
+      simplifiedPath: {
+        type: 'LineString',
+        coordinates: [startLocation.coordinates, endLocation.coordinates],
+      },
+      distance,
+      duration,
+      frequency,
+      startTime,
+      seatsAvailable,
+      price,
+      status: 'active',
+      routeIndex: index,
+    };
+  }
+
+  // Chọn ngẫu nhiên phần tử từ mảng
+  private getRandomItem<T>(array: T[]): T {
+    return array[Math.floor(Math.random() * array.length)];
+  }
+
+  // Tạo 1000 tuyến đường
+  async generateRoutes(count: number = 1000): Promise<{ message: string }> {
+    const batchSize = 100;
+    const routes: Route[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const route = await this.generateRoute(i + 1);
+      routes.push(route);
+
+      // Chèn theo batch
+      if (routes.length === batchSize || i === count - 1) {
+        try {
+          await this.routeModel.insertMany(routes, { ordered: false });
+          console.log(`Đã chèn ${i + 1} tuyến đường`);
+        } catch (error) {
+          console.error(`Lỗi khi chèn batch ${i + 1}:`, error);
+        }
+        routes.length = 0; // Xóa batch
+      }
+    }
+
+    return { message: `Đã tạo ${count} tuyến đường thành công` };
   }
 }

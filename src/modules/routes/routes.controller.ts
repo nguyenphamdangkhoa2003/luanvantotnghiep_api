@@ -37,7 +37,7 @@ export class RoutesController {
     console.log('createRouteDto', createRouteDto);
     return this.routesService.create(userId, createRouteDto);
   }
-  
+
   @Public()
   @Post('search')
   async search(@Body() searchRouteDto: SearchRouteDto) {
@@ -82,4 +82,9 @@ export class RoutesController {
   async completeTrip(@Param('id') id: string, @Req() req: AuthRequest) {
     return this.routesService.completeTrip(id, req.user._id);
   }
+
+  // @Post('generate')
+  // async generateRoutes() {
+  //   return this.routesService.generateRoutes(1000);
+  // }
 }
