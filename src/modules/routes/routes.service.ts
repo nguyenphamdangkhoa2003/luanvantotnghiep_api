@@ -34,6 +34,7 @@ import { MembershipService } from '@/modules/membership/membership.service';
 import { MembershipPackageType } from '@/common/enums/membership-package-type.enum';
 import { CancelRequestDto } from '@/modules/routes/DTOs/cancel-request.dto';
 import simplify from 'simplify-js';
+import * as turf from '@turf/turf';
 
 @Injectable()
 export class RoutesService {
@@ -217,26 +218,34 @@ export class RoutesService {
     const orConditions: any[] = [];
 
     if (startCoords) {
-      const geoCondition = this.createGeoWithinCondition(
+      const geoWithinCondition = this.createGeoWithinCondition(
+        startCoords,
+        maxDistance,
+      );
+      const geoIntersectsCondition = this.createGeoIntersectsCondition(
         startCoords,
         maxDistance,
       );
       orConditions.push(
-        { startPoint: geoCondition },
-        { waypoints: geoCondition },
-        { simplifiedPath: geoCondition },
+        { startPoint: geoWithinCondition },
+        { 'waypoints.coordinates': geoWithinCondition },
+        { simplifiedPath: geoIntersectsCondition }, // Dùng $geoIntersects cho simplifiedPath
       );
     }
 
     if (endCoords) {
-      const geoCondition = this.createGeoWithinCondition(
+      const geoWithinCondition = this.createGeoWithinCondition(
+        endCoords,
+        maxDistance,
+      );
+      const geoIntersectsCondition = this.createGeoIntersectsCondition(
         endCoords,
         maxDistance,
       );
       orConditions.push(
-        { endPoint: geoCondition },
-        { 'waypoints.coordinates': geoCondition },
-        { simplifiedPath: geoCondition },
+        { endPoint: geoWithinCondition },
+        { 'waypoints.coordinates': geoWithinCondition },
+        { simplifiedPath: geoIntersectsCondition },
       );
     }
 
@@ -256,7 +265,22 @@ export class RoutesService {
       },
     };
   }
-
+  private createGeoIntersectsCondition(
+    coords: { lng: number; lat: number },
+    maxDistance: number,
+  ): any {
+    const center = [coords.lng, coords.lat];
+    const radius = maxDistance / 1000; // Chuyển sang km
+    const circle = turf.circle(center, radius, {
+      steps: 64,
+      units: 'kilometers',
+    });
+    return {
+      $geoIntersects: {
+        $geometry: circle.geometry, // GeoJSON Polygon
+      },
+    };
+  }
   async requestRoute(
     user: User,
     requestRouteDto: RequestRouteDto,

@@ -37,7 +37,8 @@ export class RoutesController {
     console.log('createRouteDto', createRouteDto);
     return this.routesService.create(userId, createRouteDto);
   }
-
+  
+  @Public()
   @Post('search')
   async search(@Body() searchRouteDto: SearchRouteDto) {
     return this.routesService.search(searchRouteDto);
