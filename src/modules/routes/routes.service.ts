@@ -235,7 +235,7 @@ export class RoutesService {
       );
       orConditions.push(
         { endPoint: geoCondition },
-        { waypoints: geoCondition },
+        { 'waypoints.coordinates': geoCondition },
         { simplifiedPath: geoCondition },
       );
     }
