@@ -158,129 +158,128 @@ export class RoutesService {
     const geoConditions = this.buildGeoConditions(searchRouteDto);
 
     if (geoConditions.length > 0) {
-      query.$or = geoConditions;
+        // Nếu có cả startCoords và endCoords, dùng $and; nếu không, dùng $or
+        if (searchRouteDto.startCoords && searchRouteDto.endCoords) {
+            query.$and = geoConditions; // Yêu cầu cả hai nhóm điều kiện
+        } else {
+            query.$or = geoConditions; // Chỉ cần một nhóm điều kiện
+        }
     }
 
     return await this.routeModel.find(query).populate('userId').exec();
-  }
+}
 
-  private buildQuery({
+private buildQuery({
     name,
     frequency,
     seatsAvailable,
     priceRange,
     status,
-    date,
-  }: SearchRouteDto): any {
+    date
+}: SearchRouteDto): any {
     const query: any = {};
 
     if (name) {
-      query.name = { $regex: name, $options: 'i' };
+        query.name = { $regex: name, $options: 'i' };
     }
 
     if (frequency) {
-      query.frequency = frequency;
+        query.frequency = frequency;
     }
 
     if (seatsAvailable !== undefined) {
-      query.seatsAvailable = { $gte: seatsAvailable };
+        query.seatsAvailable = { $gte: seatsAvailable };
     }
 
     if (priceRange) {
-      query.price = {};
-      if (priceRange.min !== undefined) {
-        query.price.$gte = priceRange.min;
-      }
-      if (priceRange.max !== undefined) {
-        query.price.$lte = priceRange.max;
-      }
+        query.price = {};
+        if (priceRange.min !== undefined) {
+            query.price.$gte = priceRange.min;
+        }
+        if (priceRange.max !== undefined) {
+            query.price.$lte = priceRange.max;
+        }
     }
 
     if (status) {
-      query.status = status;
+        query.status = status;
     }
 
     if (date) {
-      query.startTime = {
-        $gte: new Date(date),
-        $lte: new Date(new Date(date).setHours(23, 59, 59)),
-      };
+        query.startTime = {
+            $gte: new Date(date),
+            $lte: new Date(new Date(date).setHours(23, 59, 59)),
+        };
     }
 
     return query;
-  }
+}
 
-  private buildGeoConditions({
+private buildGeoConditions({
     startCoords,
     endCoords,
-    maxDistance = 5000,
-  }: SearchRouteDto): any[] {
-    const orConditions: any[] = [];
+    maxDistance = 5000
+}: SearchRouteDto): any[] {
+    const geoConditions: any[] = [];
 
+    // Điều kiện cho startCoords
     if (startCoords) {
-      const geoWithinCondition = this.createGeoWithinCondition(
-        startCoords,
-        maxDistance,
-      );
-      const geoIntersectsCondition = this.createGeoIntersectsCondition(
-        startCoords,
-        maxDistance,
-      );
-      orConditions.push(
-        { startPoint: geoWithinCondition },
-        { 'waypoints.coordinates': geoWithinCondition },
-        { simplifiedPath: geoIntersectsCondition }, // Dùng $geoIntersects cho simplifiedPath
-      );
+        const geoWithinCondition = this.createGeoWithinCondition(startCoords, maxDistance);
+        const geoIntersectsCondition = this.createGeoIntersectsCondition(startCoords, maxDistance);
+        const startConditions = {
+            $or: [
+                { startPoint: geoWithinCondition },
+                { 'waypoints.coordinates': geoWithinCondition },
+                { simplifiedPath: geoIntersectsCondition }
+            ]
+        };
+        geoConditions.push(startConditions);
     }
 
+    // Điều kiện cho endCoords
     if (endCoords) {
-      const geoWithinCondition = this.createGeoWithinCondition(
-        endCoords,
-        maxDistance,
-      );
-      const geoIntersectsCondition = this.createGeoIntersectsCondition(
-        endCoords,
-        maxDistance,
-      );
-      orConditions.push(
-        { endPoint: geoWithinCondition },
-        { 'waypoints.coordinates': geoWithinCondition },
-        { simplifiedPath: geoIntersectsCondition },
-      );
+        const geoWithinCondition = this.createGeoWithinCondition(endCoords, maxDistance);
+        const geoIntersectsCondition = this.createGeoIntersectsCondition(endCoords, maxDistance);
+        const endConditions = {
+            $or: [
+                { endPoint: geoWithinCondition },
+                { 'waypoints.coordinates': geoWithinCondition },
+                { simplifiedPath: geoIntersectsCondition }
+            ]
+        };
+        geoConditions.push(endConditions);
     }
 
-    return orConditions;
-  }
+    return geoConditions;
+}
 
-  private createGeoWithinCondition(
+private createGeoWithinCondition(
     coords: { lng: number; lat: number },
-    maxDistance: number,
-  ): any {
+    maxDistance: number
+): any {
     return {
-      $geoWithin: {
-        $centerSphere: [
-          [coords.lng, coords.lat],
-          this.metersToRadians(maxDistance),
-        ],
-      },
+        $geoWithin: {
+            $centerSphere: [
+                [coords.lng, coords.lat],
+                this.metersToRadians(maxDistance)
+            ]
+        }
     };
-  }
-  private createGeoIntersectsCondition(
+}
+
+private createGeoIntersectsCondition(
     coords: { lng: number; lat: number },
-    maxDistance: number,
-  ): any {
+    maxDistance: number
+): any {
     const center = [coords.lng, coords.lat];
     const radius = maxDistance / 1000; // Chuyển sang km
-    const circle = turf.circle(center, radius, {
-      steps: 64,
-      units: 'kilometers',
-    });
+    const circle = turf.circle(center, radius, { steps: 64, units: 'kilometers' });
     return {
-      $geoIntersects: {
-        $geometry: circle.geometry, // GeoJSON Polygon
-      },
+        $geoIntersects: {
+            $geometry: circle.geometry // GeoJSON Polygon
+        }
     };
-  }
+}
   async requestRoute(
     user: User,
     requestRouteDto: RequestRouteDto,
