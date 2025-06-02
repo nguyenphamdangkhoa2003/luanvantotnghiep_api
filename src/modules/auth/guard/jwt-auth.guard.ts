@@ -26,23 +26,38 @@ export class JwtAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Kiểm tra xem route có được đánh dấu là public hay không
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
     if (isPublic) {
-      return true; // Bỏ qua xác thực nếu route là public
+      return true;
     }
 
     const request = context.switchToHttp().getRequest<AuthRequest>();
-    const token = getCookies(request, TokenTypeEnum.ACCESS);
-    if (!token || typeof token !== 'string') {
+
+    let token: string | undefined;
+
+    // Check header first
+    const authHeader = request.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.replace('Bearer ', '');
+    }
+
+    // Fallback to cookie if no token found in header
+    if (!token) {
+      const cookieToken = getCookies(request, TokenTypeEnum.ACCESS);
+      // Ensure cookieToken is a string
+      token = typeof cookieToken === 'string' ? cookieToken : undefined;
+    }
+
+    if (!token) {
       throw new UnauthorizedException(
-        'Không tìm thấy access token trong cookie',
+        'Không tìm thấy access token trong header hoặc cookie',
       );
     }
+
     try {
       const payload = await this.jwtAuthService.verifyToken<IAccessToken>(
         token,
@@ -50,7 +65,7 @@ export class JwtAuthGuard implements CanActivate {
       );
       const user = await this.userSerivce.findOneById(payload.id);
       if (!user) {
-        throw new NotFoundException();
+        throw new NotFoundException('Người dùng không tồn tại');
       }
       request.user = user;
     } catch (e) {

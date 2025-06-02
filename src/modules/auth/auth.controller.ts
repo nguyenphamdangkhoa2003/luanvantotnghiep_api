@@ -64,6 +64,7 @@ export class AuthController {
         options: {
           maxAge:
             Number(this.configService.get<string>('jwt.access.time')) * 1000,
+          httpOnly: false,
         },
       },
       {
@@ -102,6 +103,7 @@ export class AuthController {
         options: {
           maxAge:
             Number(this.configService.get<string>('jwt.access.time')) * 1000,
+          httpOnly: false,
         }, // 1 giờ
       },
       {
@@ -187,6 +189,7 @@ export class AuthController {
         options: {
           maxAge:
             Number(this.configService.get<string>('jwt.access.time')) * 1000,
+          httpOnly: false,
         },
       },
       {
@@ -266,6 +269,7 @@ export class AuthController {
         options: {
           maxAge:
             Number(this.configService.get<string>('jwt.access.time')) * 1000,
+          httpOnly: false,
         }, // 1 giờ
       },
       {

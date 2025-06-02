@@ -22,6 +22,7 @@ import {
   OAuthProviderSchema,
 } from '@/modules/auth/schemas/oauth-provider.schema';
 import { CloudinaryService } from '@/common/services/cloudinary.service';
+import { PusherService } from '@/modules/chat/pusher.service';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { CloudinaryService } from '@/common/services/cloudinary.service';
     JwtAuthService,
     UsersService,
     CloudinaryService,
+    PusherService,
   ],
   controllers: [ChatController],
   exports: [ChatService],

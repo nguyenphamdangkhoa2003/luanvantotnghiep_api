@@ -405,7 +405,7 @@ export class RoutesService {
     );
 
     await this.mailService.sendMail(
-      user.email,
+      ownerCarUser.email,
       'New Route Join Request',
       'route-request-email',
       {

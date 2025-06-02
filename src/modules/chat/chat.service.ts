@@ -16,6 +16,7 @@ import { MailService } from '@/modules/mail/mail.service';
 import { User, UserDocument } from '@/modules/users/schemas/user.schema';
 import { Route, RouteDocument } from '@/modules/routes/schemas/routes.schema';
 import { Logger } from '@nestjs/common';
+import { PusherService } from './pusher.service';
 
 @Injectable()
 export class ChatService {
@@ -27,9 +28,9 @@ export class ChatService {
     @InjectModel(Route.name) private routeModel: Model<RouteDocument>,
     private notificationService: NotificationService,
     private mailService: MailService,
+    private pusherService: PusherService,
   ) {}
 
-  // Tạo cuộc trò chuyện khi yêu cầu được chấp nhận
   async createConversation(
     requestId: string,
     ownerId: string,
@@ -45,8 +46,7 @@ export class ChatService {
     return conversation.save();
   }
 
-  // Kiểm tra cuộc trò chuyện tồn tại
-  private async checkConversationExists(
+  public async checkConversationExists(
     conversationId: string,
     populateFields: { path: string; select: string }[] = [],
   ): Promise<ConversationDocument> {
@@ -60,7 +60,6 @@ export class ChatService {
     return conversation as ConversationDocument;
   }
 
-  // Kiểm tra quyền truy cập cuộc trò chuyện
   public checkConversationAuthorization(
     conversation: ConversationDocument,
     userId: string,
@@ -75,31 +74,32 @@ export class ChatService {
     }
   }
 
-  // Xác định người nhận (recipient) trong cuộc trò chuyện
   private getRecipientId(conversation: any, userId: string): string {
     return conversation.ownerId._id.toString() === userId
       ? conversation.passengerId._id.toString()
       : conversation.ownerId._id.toString();
   }
 
-  // Gửi tin nhắn
   async sendMessage(
     userId: string,
     sendMessageDto: SendMessageDto,
   ): Promise<Message> {
     const { conversationId, content } = sendMessageDto;
 
-    // Kiểm tra cuộc trò chuyện và populate thông tin
     const conversation = (await this.checkConversationExists(conversationId, [
       { path: 'ownerId', select: 'name email' },
       { path: 'passengerId', select: 'name email' },
       { path: 'routeId', select: 'name' },
     ])) as any;
 
-    // Kiểm tra quyền
-    this.checkConversationAuthorization(conversation, userId);
-
-    // Tạo tin nhắn
+    if (
+      conversation.ownerId._id.toString() !== userId.toString() &&
+      conversation.passengerId._id.toString() !== userId.toString()
+    ) {
+      throw new ForbiddenException(
+        'You are not authorized to access this conversation',
+      );
+    }
     const message = new this.messageModel({
       conversationId,
       senderId: userId,
@@ -139,6 +139,16 @@ export class ChatService {
       },
     );
 
+    // Gửi sự kiện newMessage qua Pusher
+    await this.pusherService.trigger(
+      `private-${conversationId}`,
+      'newMessage',
+      {
+        ...message.toObject(),
+        timestamp: new Date(),
+      },
+    );
+
     return message;
   }
 
@@ -155,26 +165,43 @@ export class ChatService {
       .exec();
   }
 
-  async markAsRead(conversationId: string, userId: string) {
-    const conversation = await this.checkConversationExists(conversationId);
+  async markAsRead(userId: string, messageId: string): Promise<void> {
+    const message = await this.messageModel.findById(messageId).exec();
+    if (!message) {
+      throw new NotFoundException('Message not found');
+    }
+
+    const conversation = await this.checkConversationExists(
+      message.conversationId.toString(),
+    );
     this.checkConversationAuthorization(conversation, userId);
 
     await this.messageModel
       .updateMany(
-        { conversationId, senderId: { $ne: userId }, isRead: false },
+        { _id: messageId, senderId: { $ne: userId }, isRead: false },
         { isRead: true },
       )
       .exec();
+
+    // Gửi sự kiện messageRead qua Pusher
+    await this.pusherService.trigger(
+      `private-${message.conversationId}`,
+      'messageRead',
+      {
+        messageId,
+        userId,
+        conversationId: message.conversationId,
+        timestamp: new Date(),
+      },
+    );
   }
 
   async updateUserStatus(userId: string, isOnline: boolean): Promise<void> {
     try {
-      // Kiểm tra userId hợp lệ
       if (!userId || !Types.ObjectId.isValid(userId)) {
         throw new Error('Invalid user ID');
       }
 
-      // Cập nhật trạng thái online và lastSeen
       const updateData: Partial<User> = {
         isOnline,
         lastSeen: isOnline ? undefined : new Date(),
@@ -195,9 +222,46 @@ export class ChatService {
           isOnline ? 'null' : updateData.lastSeen
         }`,
       );
+
+      // Gửi sự kiện userStatus qua Pusher
+      await this.pusherService.trigger('presence-users', 'userStatus', {
+        userId,
+        isOnline,
+      });
     } catch (error) {
       Logger.error(`Failed to update user status: ${error.message}`);
       throw error;
     }
+  }
+
+  async handleTyping(
+    userId: string,
+    conversationId: string,
+    isTyping: boolean,
+  ): Promise<void> {
+    const conversation = await this.checkConversationExists(conversationId);
+    this.checkConversationAuthorization(conversation, userId);
+
+    // Gửi sự kiện typing qua Pusher
+    await this.pusherService.trigger(`private-${conversationId}`, 'typing', {
+      userId,
+      conversationId,
+      isTyping,
+    });
+  }
+
+  async closeConversation(conversationId: string): Promise<void> {
+    const conversation = await this.checkConversationExists(conversationId);
+    await this.conversationModel.deleteOne({ _id: conversationId }).exec();
+
+    // Gửi sự kiện conversationClosed qua Pusher
+    await this.pusherService.trigger(
+      `private-${conversationId}`,
+      'conversationClosed',
+      {
+        conversationId,
+        timestamp: new Date(),
+      },
+    );
   }
 }

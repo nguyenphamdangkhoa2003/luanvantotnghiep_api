@@ -31,7 +31,11 @@ import {
   MembershipSchema,
 } from '@/modules/membership/schemas/membership.schema';
 import { VnPayService } from '@/modules/vn-pay/vn-pay.service';
-import { Package, PackageSchema } from '@/modules/membership/schemas/package.schema';
+import {
+  Package,
+  PackageSchema,
+} from '@/modules/membership/schemas/package.schema';
+import { PusherService } from '@/modules/chat/pusher.service';
 
 @Module({
   imports: [
@@ -74,6 +78,7 @@ import { Package, PackageSchema } from '@/modules/membership/schemas/package.sch
     ChatService,
     MembershipService,
     VnPayService,
+    PusherService,
   ],
 })
 export class RoutesModule {}

@@ -2,6 +2,7 @@ import { ICloundinaryConfig } from '@/config/interface/cloudinary-config.interfa
 import { IEmailConfig } from '@/config/interface/email-config.interface';
 import { IGoogleOauth2Config } from '@/config/interface/google-oauth2-config.interface';
 import { IJwtConfig } from '@/config/interface/jwt-config.interface';
+import { IPusherConfig } from '@/config/interface/pusher-config.inteface';
 import { IVnpayConfig } from '@/config/interface/vnpay-config.interface';
 
 export interface IAppConfig {
@@ -23,4 +24,5 @@ export interface IAppConfig {
   cloudinary: ICloundinaryConfig;
   vnpay: IVnpayConfig;
   mapbox_access_token: string;
+  pusher: IPusherConfig;
 }

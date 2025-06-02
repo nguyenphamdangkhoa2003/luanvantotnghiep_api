@@ -128,6 +128,22 @@ class ConfigSchema {
   @IsString()
   @IsNotEmpty()
   MAPBOX_ACCESS_TOKEN: string;
+
+  @IsString()
+  @IsNotEmpty()
+  PUSHER_APP_ID: string;
+
+  @IsString()
+  @IsNotEmpty()
+  PUSHER_KEY: string;
+
+  @IsString()
+  @IsNotEmpty()
+  PUSHER_SECRET: string;
+
+  @IsString()
+  @IsNotEmpty()
+  PUSHER_CLUSTER: string;
 }
 
 export const configModuleOptions: ConfigModuleOptions = {
@@ -222,6 +238,10 @@ export default (): IAppConfig => {
     VNPAY_PAYMENT_GATEWAY: process.env.VNPAY_PAYMENT_GATEWAY,
     VNPAY_RETURN_URL: process.env.VNPAY_RETURN_URL,
     MAPBOX_ACCESS_TOKEN: process.env.MAPBOX_ACCESS_TOKEN,
+    PUSHER_APP_ID: process.env.PUSHER_APP_ID,
+    PUSHER_KEY: process.env.PUSHER_KEY,
+    PUSHER_SECRET: process.env.PUSHER_SECRET,
+    PUSHER_CLUSTER: process.env.PUSHER_CLUSTER,
   });
 
   return {
@@ -282,5 +302,12 @@ export default (): IAppConfig => {
       return_url: env.VNPAY_RETURN_URL,
     },
     mapbox_access_token: env.MAPBOX_ACCESS_TOKEN,
+    pusher: {
+      app_id: env.PUSHER_APP_ID,
+      cluster: env.PUSHER_CLUSTER,
+      key: env.PUSHER_KEY,
+      secret: env.PUSHER_SECRET,
+      useTLS: true,
+    },
   };
 };

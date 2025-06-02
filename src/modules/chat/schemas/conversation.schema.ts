@@ -8,16 +8,16 @@ export class Conversation {
   declare _id: string;
 
   @Prop({ required: true, ref: 'User' })
-  ownerId: string; // Chủ xe
+  ownerId: string;
 
   @Prop({ required: true, ref: 'User' })
-  passengerId: string; // Hành khách
+  passengerId: string;
 
   @Prop({ required: true, ref: 'Request' })
-  requestId: string; // Yêu cầu được chấp nhận
+  requestId: string; 
 
   @Prop({ required: true, ref: 'Route' })
-  routeId: string; // Tuyến đường
+  routeId: string; 
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
