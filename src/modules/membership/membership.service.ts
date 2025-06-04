@@ -19,6 +19,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Model } from 'mongoose';
 
 @Injectable()
@@ -176,5 +177,20 @@ export class MembershipService {
   async getMembershipInfo(userId: string) {
     const user = await this.userModel.findById(userId).exec();
     return user?.currentMembership || null;
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async updateExpiredMemberships(): Promise<void> {
+    const currentDate = new Date();
+
+    await this.membershipModel.updateMany(
+      {
+        endDate: { $lt: currentDate },
+        status: 'active',
+      },
+      {
+        $set: { status: 'expired' },
+      },
+    );
   }
 }
