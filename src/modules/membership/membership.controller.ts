@@ -8,6 +8,7 @@ import {
   Req,
   Query,
   Delete,
+  NotFoundException,
 } from '@nestjs/common';
 import { MembershipService } from './membership.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -19,6 +20,7 @@ import { UserRole } from '@/modules/users/schemas/user.schema';
 import { RolesGuard } from '@/modules/auth/guard/role.guard';
 import { CreatePackageDto } from '@/modules/membership/DTOs/create-package.dto';
 import { UpdatePackageDto } from '@/modules/membership/DTOs/update-package.dto';
+import { Membership } from '@/modules/membership/schemas/membership.schema';
 
 @Controller('membership')
 export class MembershipController {
@@ -73,5 +75,21 @@ export class MembershipController {
     return this.membershipService.deletePackage(packageName);
   }
 
-  
+  @Get()
+  async getAllMemberships(): Promise<Membership[]> {
+    return this.membershipService.findAll();
+  }
+
+  @Get('me')
+  async getActiveMembership(@Req() req: AuthRequest): Promise<Membership> {
+    const membership = await this.membershipService.findActiveByUserId(
+      req.user._id,
+    );
+    if (!membership) {
+      throw new NotFoundException(
+        `No active membership found for user ${req.user._id}`,
+      );
+    }
+    return membership;
+  }
 }

@@ -20,7 +20,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 
 @Injectable()
 export class MembershipService {
@@ -177,6 +177,18 @@ export class MembershipService {
   async getMembershipInfo(userId: string) {
     const user = await this.userModel.findById(userId).exec();
     return user?.currentMembership || null;
+  }
+
+  async findAll(): Promise<Membership[]> {
+    return this.membershipModel.find().exec();
+  }
+
+  async findActiveByUserId(userId: string): Promise<Membership | null> {
+    return this.membershipModel
+      .findOne({
+        userId: userId.toString(),
+      })
+      .exec();
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
