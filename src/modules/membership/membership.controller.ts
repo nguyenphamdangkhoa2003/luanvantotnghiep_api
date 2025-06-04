@@ -43,10 +43,8 @@ export class MembershipController {
     return this.membershipService.getMembershipInfo(userId);
   }
 
-  // Admin routes
+  @Public()
   @Get('packages')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
   async getAllPackages() {
     return this.membershipService.getAllPackages();
   }

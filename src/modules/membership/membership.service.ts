@@ -6,7 +6,10 @@ import {
   Membership,
   MembershipDocument,
 } from '@/modules/membership/schemas/membership.schema';
-import { Package, PackageDocument } from '@/modules/membership/schemas/package.schema';
+import {
+  Package,
+  PackageDocument,
+} from '@/modules/membership/schemas/package.schema';
 import { User, UserDocument } from '@/modules/users/schemas/user.schema';
 import { VnPayService } from '@/modules/vn-pay/vn-pay.service';
 import {
@@ -95,9 +98,7 @@ export class MembershipService {
       );
     }
 
-    await this.packageModel
-      .updateOne({ name: packageName }, { $set: { isActive: false } })
-      .exec();
+    await this.packageModel.findOneAndDelete({ name: packageName }).exec();
 
     return { message: 'Package deleted successfully' };
   }
