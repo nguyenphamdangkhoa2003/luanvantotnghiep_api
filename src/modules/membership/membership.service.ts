@@ -180,7 +180,16 @@ export class MembershipService {
   }
 
   async findAll(): Promise<Membership[]> {
-    return this.membershipModel.find().exec();
+    const memberships = await this.membershipModel
+      .find()
+      .populate('userId') // Lấy chi tiết user từ reference
+      .exec();
+
+    if (!memberships || memberships.length === 0) {
+      throw new NotFoundException('No membership packages found.');
+    }
+
+    return memberships;
   }
 
   async findActiveByUserId(userId: string): Promise<Membership | null> {
