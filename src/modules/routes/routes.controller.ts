@@ -21,6 +21,7 @@ import { RequestRouteDto } from '@/modules/routes/DTOs/request-route.dto';
 import { HandleRequestDto } from '@/modules/routes/DTOs/handle-request.dto';
 import { GetPassengersDto } from '@/modules/routes/DTOs/get-passengers.dto';
 import { Public } from '@/modules/auth/decorators/public.decorators';
+import { CancelRequestDto } from '@/modules/routes/DTOs/cancel-request.dto';
 
 @Controller('routes')
 export class RoutesController {
@@ -88,6 +89,14 @@ export class RoutesController {
     return this.routesService.getRoutesByDriver(userId);
   }
 
+  @Post('cancel')
+  async cancelBooking(
+    @Body() cancelBookingDto: CancelRequestDto,
+    @Req() req: AuthRequest,
+  ) {
+    const userId = req.user._id;
+    return this.routesService.cancelBooking(userId, cancelBookingDto);
+  }
   // @Post('generate')
   // async generateRoutes() {
   //   return this.routesService.generateRoutes(1000);
