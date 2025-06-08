@@ -155,14 +155,18 @@ export class ChatService {
   async getMessages(
     userId: string,
     conversationId: string,
-  ): Promise<Message[]> {
+  ): Promise<{ messages: Message[]; requestId: string }> {
     const conversation = await this.checkConversationExists(conversationId);
     this.checkConversationAuthorization(conversation, userId);
 
-    return this.messageModel
+    const messages = await this.messageModel
       .find({ conversationId })
       .sort({ createdAt: 1 })
       .exec();
+    return {
+      messages,
+      requestId: conversation.requestId,
+    };
   }
 
   async markAsRead(userId: string, messageId: string): Promise<void> {
