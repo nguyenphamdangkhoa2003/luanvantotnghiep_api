@@ -135,7 +135,7 @@ export class RoutesService {
     tolerance: number = 0.001,
   ): [number, number][] {
     const points = coordinates.map(([lng, lat]) => ({ x: lng, y: lat }));
-    const simplified = simplify(points, tolerance, true); // true: giữ chất lượng cao
+    const simplified = simplify(points, tolerance, true);
     return simplified.map((p) => [p.x, p.y]);
   }
 
@@ -367,6 +367,7 @@ export class RoutesService {
       },
     };
   }
+
   async requestRoute(
     user: User,
     requestRouteDto: RequestRouteDto,
@@ -963,5 +964,17 @@ export class RoutesService {
     }
 
     return { message: `Đã tạo ${count} tuyến đường thành công` };
+  }
+
+  async getRoutesByDriver(userId: string): Promise<Route[]> {
+    const routes = await this.routeModel.find({ userId }).exec();
+
+    if (!routes || routes.length === 0) {
+      throw new NotFoundException(
+        `No routes found for driver with ID: ${userId}`,
+      );
+    }
+
+    return routes;
   }
 }

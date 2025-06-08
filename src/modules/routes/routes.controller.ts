@@ -83,6 +83,11 @@ export class RoutesController {
     return this.routesService.completeTrip(id, req.user._id);
   }
 
+  @Get('driver/:userId')
+  async getRoutesByDriver(@Param('userId') userId: string) {
+    return this.routesService.getRoutesByDriver(userId);
+  }
+
   // @Post('generate')
   // async generateRoutes() {
   //   return this.routesService.generateRoutes(1000);
