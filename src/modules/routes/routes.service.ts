@@ -977,4 +977,42 @@ export class RoutesService {
 
     return routes;
   }
+
+  async getRequestsByDriverId(driverId: string): Promise<Request[]> {
+    try {
+      // Lấy tất cả route mà tài xế đã tạo
+      const routes = await this.routeModel
+        .find({ userId: driverId }, { _id: 1 })
+        .exec();
+
+      if (!routes || routes.length === 0) {
+        throw new NotFoundException(
+          `No routes found for driver with ID ${driverId}`,
+        );
+      }
+
+      const routeIds = routes.map((route) => route._id);
+
+      // Lấy các request có routeId nằm trong các route tài xế đã tạo
+      const requests = await this.requestModel
+        .find({ routeId: { $in: routeIds } })
+        .populate('userId', 'name email') // populate người gửi yêu cầu
+        .populate('routeId') // populate thông tin route
+        .exec();
+
+      if (!requests || requests.length === 0) {
+        throw new NotFoundException(
+          `No requests found for driver with ID ${driverId}`,
+        );
+      }
+
+      return requests;
+    } catch (error) {
+      // Nếu không phải lỗi do NotFoundException thì ném lỗi server
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to fetch requests');
+    }
+  }
 }

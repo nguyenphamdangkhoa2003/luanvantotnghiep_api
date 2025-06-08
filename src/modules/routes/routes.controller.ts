@@ -89,6 +89,11 @@ export class RoutesController {
     return this.routesService.getRoutesByDriver(userId);
   }
 
+  @Get('requests/driver/:driverId')
+  async getRequestsByDriverId(@Param('driverId') driverId: string) {
+    return this.routesService.getRequestsByDriverId(driverId);
+  }
+
   @Post('cancel')
   async cancelBooking(
     @Body() cancelBookingDto: CancelRequestDto,
