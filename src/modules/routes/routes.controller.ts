@@ -106,4 +106,15 @@ export class RoutesController {
   // async generateRoutes() {
   //   return this.routesService.generateRoutes(1000);
   // }
+
+  @Get('passenger/:userId')
+  async getRoutesByPassenger(@Param('userId') userId: string) {
+    return this.routesService.getRoutesByPassenger(userId);
+  }
+
+  // routes.controller.ts
+  @Get('requests/user/:userId')
+  async getRequestsByUserId(@Param('userId') userId: string) {
+    return this.routesService.getRequestsByUserId(userId);
+  }
 }

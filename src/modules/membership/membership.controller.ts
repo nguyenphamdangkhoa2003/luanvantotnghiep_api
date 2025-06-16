@@ -21,6 +21,8 @@ import { RolesGuard } from '@/modules/auth/guard/role.guard';
 import { CreatePackageDto } from '@/modules/membership/DTOs/create-package.dto';
 import { UpdatePackageDto } from '@/modules/membership/DTOs/update-package.dto';
 import { Membership } from '@/modules/membership/schemas/membership.schema';
+import { Response } from 'express';
+import { Res } from '@nestjs/common';
 
 @Controller('membership')
 export class MembershipController {
@@ -36,8 +38,13 @@ export class MembershipController {
 
   @Public()
   @Get('vnpay-callback')
-  async handleVnpayCallback(@Query() vnpayData: any) {
-    return this.membershipService.handleVnpayCallback(vnpayData);
+  async handleVnpayCallback(@Query() vnpayData: any, @Res() res: Response) {
+    try {
+      await this.membershipService.handleVnpayCallback(vnpayData);
+      return res.redirect('http://localhost:3001/driverpass?payment=success');
+    } catch (err) {
+      return res.redirect('http://localhost:3001/driverpass?payment=fail');
+    }
   }
 
   @Get('info/:userId')

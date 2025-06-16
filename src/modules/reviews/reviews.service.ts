@@ -1,4 +1,4 @@
-// reviews.service.ts
+// src/modules/reviews/reviews.service.ts
 import {
   Review,
   ReviewDocument,
@@ -38,10 +38,9 @@ export class ReviewsService {
       throw new BadRequestException('Invalid or incomplete trip');
     }
 
-    // Kiểm tra người dùng có tham gia chuyến đi
     const isValidReviewer =
       (reviewType === UserRole.DRIVER &&
-        tripRequest.routeId.userId === reviewerId) ||
+        tripRequest.routeId.userId.toString() === reviewerId) ||
       (reviewType === UserRole.CUSTOMER &&
         tripRequest.userId.toString() === reviewerId);
     if (!isValidReviewer) {
@@ -50,7 +49,6 @@ export class ReviewsService {
       );
     }
 
-    // Kiểm tra đã đánh giá chưa
     const existingReview = await this.reviewModel.findOne({
       reviewer: reviewerId,
       tripRequest: tripRequestId,
@@ -69,7 +67,6 @@ export class ReviewsService {
       reviewType,
     });
 
-    // Cập nhật điểm trung bình của người được đánh giá
     const reviews = await this.reviewModel.find({ reviewee: revieweeId });
     const averageRating =
       reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
@@ -79,6 +76,35 @@ export class ReviewsService {
     });
 
     return review;
+  }
+
+  async checkReviewStatus(
+    reviewerId: string,
+    tripRequestId: string,
+  ): Promise<{ hasReviewed: boolean }> {
+    const tripRequest = (await this.tripRequestModel
+      .findById(tripRequestId)
+      .populate('routeId')) as any;
+    if (!tripRequest) {
+      throw new BadRequestException('Trip request not found');
+    }
+    tripRequest.routeId = tripRequest.routeId as Route;
+
+    // Kiểm tra reviewerId hợp lệ
+    const isValidReviewer =
+      tripRequest.routeId.userId.toString() === reviewerId ||
+      tripRequest.userId.toString() === reviewerId;
+    if (!isValidReviewer) {
+      throw new BadRequestException(
+        'You are not authorized to check this review status.',
+      );
+    }
+
+    const existingReview = await this.reviewModel.findOne({
+      reviewer: reviewerId,
+      tripRequest: tripRequestId,
+    });
+    return { hasReviewed: !!existingReview };
   }
 
   async getReviewsGivenByUser(userId: string) {

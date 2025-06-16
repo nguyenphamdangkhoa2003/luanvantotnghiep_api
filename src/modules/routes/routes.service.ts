@@ -1015,4 +1015,57 @@ export class RoutesService {
       throw new InternalServerErrorException('Failed to fetch requests');
     }
   }
+
+  async getRoutesByPassenger(userId: string): Promise<Route[]> {
+    try {
+      // Lấy các request được chấp nhận của hành khách
+      const requests = await this.requestModel
+        .find({ userId, status: RequestStatus.ACCEPTED })
+        .select('routeId')
+        .exec();
+
+      if (!requests || requests.length === 0) {
+        throw new NotFoundException(
+          `No routes found for passenger with ID ${userId}`,
+        );
+      }
+
+      const routeIds = requests.map((req) => req.routeId);
+      const routes = await this.routeModel
+        .find({ _id: { $in: routeIds } })
+        .populate('userId', 'name email')
+        .exec();
+
+      return routes;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to fetch routes');
+    }
+  }
+
+  // routes.service.ts
+  async getRequestsByUserId(userId: string): Promise<Request[]> {
+    try {
+      const requests = await this.requestModel
+        .find({ userId })
+        .populate('userId', 'name email')
+        .populate('routeId')
+        .exec();
+
+      if (!requests || requests.length === 0) {
+        throw new NotFoundException(
+          `No requests found for user with ID ${userId}`,
+        );
+      }
+
+      return requests;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to fetch requests');
+    }
+  }
 }
