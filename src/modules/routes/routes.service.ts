@@ -1018,16 +1018,17 @@ export class RoutesService {
 
   async getRoutesByPassenger(userId: string): Promise<Route[]> {
     try {
-      // Lấy các request được chấp nhận của hành khách
       const requests = await this.requestModel
-        .find({ userId, status: RequestStatus.ACCEPTED })
+        .find({
+          userId,
+          status: { $in: [RequestStatus.ACCEPTED, RequestStatus.COMPLETED] },
+        })
         .select('routeId')
         .exec();
 
+      // Trả về mảng rỗng nếu không có request
       if (!requests || requests.length === 0) {
-        throw new NotFoundException(
-          `No routes found for passenger with ID ${userId}`,
-        );
+        return [];
       }
 
       const routeIds = requests.map((req) => req.routeId);
@@ -1036,12 +1037,12 @@ export class RoutesService {
         .populate('userId', 'name email')
         .exec();
 
-      return routes;
+      return routes || [];
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new InternalServerErrorException('Failed to fetch routes');
+      console.error(`Lỗi khi lấy routes cho passenger ${userId}:`, error);
+      throw new InternalServerErrorException(
+        'Không thể lấy danh sách tuyến đường',
+      );
     }
   }
 
@@ -1051,21 +1052,12 @@ export class RoutesService {
       const requests = await this.requestModel
         .find({ userId })
         .populate('userId', 'name email')
-        .populate('routeId')
+        .populate('routeId', 'name userId status')
         .exec();
-
-      if (!requests || requests.length === 0) {
-        throw new NotFoundException(
-          `No requests found for user with ID ${userId}`,
-        );
-      }
-
-      return requests;
+      return requests || [];
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new InternalServerErrorException('Failed to fetch requests');
+      console.error(`Lỗi khi lấy requests cho user ${userId}:`, error);
+      throw new InternalServerErrorException('Không thể lấy danh sách yêu cầu');
     }
   }
 }
