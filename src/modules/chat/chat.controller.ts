@@ -95,4 +95,10 @@ export class ChatController {
     );
     return { status: 'success' };
   }
+
+  @Get('conversations')
+  async getUserConversations(@Req() req: AuthRequest) {
+    const userId = req.user._id;
+    return this.chatService.getConversationsByUserId(userId);
+  }
 }

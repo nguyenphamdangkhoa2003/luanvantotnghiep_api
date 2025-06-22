@@ -504,7 +504,6 @@ export class RoutesService {
               { session },
             );
           }
-
           const passenger = new this.passengerModel({
             userId: request.userId,
             routeId: request.routeId,

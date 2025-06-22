@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -267,5 +268,25 @@ export class ChatService {
         timestamp: new Date(),
       },
     );
+  }
+
+  async getConversationsByUserId(userId: string) {
+    try {
+      const conversations = await this.conversationModel
+        .find({
+          $or: [{ ownerId: userId }, { passengerId: userId }],
+        })
+        .populate('ownerId')
+        .populate('passengerId')
+        .populate('requestId')
+        .populate('routeId')
+        .exec();
+
+      return conversations;
+    } catch (error) {
+      // Log error nếu bạn có logger, ví dụ: this.logger.error(error);
+      console.error('Error getting conversations:', error);
+      throw new InternalServerErrorException('Failed to get conversations');
+    }
   }
 }
