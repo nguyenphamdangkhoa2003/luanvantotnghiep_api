@@ -10,7 +10,11 @@ import {
   UserDocument,
   UserRole,
 } from '@/modules/users/schemas/user.schema';
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
@@ -121,5 +125,20 @@ export class ReviewsService {
       .populate('reviewer', 'name')
       .populate('tripRequest', 'startLocation endLocation')
       .exec();
+  }
+
+  async getReviews() {
+    try {
+      const reviews = await this.reviewModel.find().exec();
+
+      if (!reviews || reviews.length === 0) {
+        throw new InternalServerErrorException('No reviews found');
+      }
+
+      return reviews;
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      throw new InternalServerErrorException('Failed to get reviews');
+    }
   }
 }
