@@ -1,7 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, HydratedDocument, Types } from 'mongoose';
 
-
 export type MembershipDocument = HydratedDocument<Membership>;
 
 @Schema({ timestamps: true })
@@ -9,7 +8,7 @@ export class Membership {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ required: true})
+  @Prop({ required: true })
   packageType: string;
 
   @Prop({ required: true })
@@ -29,8 +28,10 @@ export class Membership {
 
   @Prop({ default: 'active', enum: ['active', 'expired', 'cancelled'] })
   status: string;
+
+  // Thêm thuộc tính description (danh sách mô tả gói)
+  @Prop({ type: [String], default: [] })
+  description: string[];
 }
 
 export const MembershipSchema = SchemaFactory.createForClass(Membership);
-
-

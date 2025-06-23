@@ -1,4 +1,10 @@
-import { IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdatePackageDto {
@@ -23,4 +29,9 @@ export class UpdatePackageDto {
   @IsPositive()
   @Type(() => Number)
   durationDays?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  description?: string[];
 }

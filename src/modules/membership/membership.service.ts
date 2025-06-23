@@ -53,6 +53,7 @@ export class MembershipService {
       acceptRequests: dto.acceptRequests,
       price: dto.price,
       durationDays: dto.durationDays,
+      description: dto.description,
     });
 
     return newPackage;

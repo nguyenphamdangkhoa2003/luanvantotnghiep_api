@@ -1,4 +1,4 @@
-import { IsNumber, IsPositive, IsString } from 'class-validator';
+import { IsArray, IsNumber, IsPositive, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreatePackageDto {
@@ -19,4 +19,8 @@ export class CreatePackageDto {
   @IsPositive()
   @Type(() => Number)
   durationDays: number;
+
+  @IsArray()
+  @IsString({ each: true })
+  description: string[];
 }
