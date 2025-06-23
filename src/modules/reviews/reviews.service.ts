@@ -129,7 +129,12 @@ export class ReviewsService {
 
   async getReviews() {
     try {
-      const reviews = await this.reviewModel.find().exec();
+      const reviews = await this.reviewModel
+        .find()
+        .populate('reviewer', 'name email avatar') // chỉ lấy các field cần thiết từ User
+        .populate('reviewee', 'name email avatar')
+        .populate('tripRequest') // có thể populate toàn bộ hoặc chọn field (nếu cần)
+        .exec();
 
       if (!reviews || reviews.length === 0) {
         throw new InternalServerErrorException('No reviews found');
