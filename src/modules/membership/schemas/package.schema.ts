@@ -16,6 +16,9 @@ export class Package {
 
   @Prop({ required: true })
   durationDays: number;
+  
+  @Prop({ type: [String], default: [] })
+    description: string[];
 }
 
 export const PackageSchema = SchemaFactory.createForClass(Package);

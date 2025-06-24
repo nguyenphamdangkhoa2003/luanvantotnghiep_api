@@ -30,8 +30,7 @@ export class Membership {
   status: string;
 
   // Thêm thuộc tính description (danh sách mô tả gói)
-  @Prop({ type: [String], default: [] })
-  description: string[];
+  
 }
 
 export const MembershipSchema = SchemaFactory.createForClass(Membership);
