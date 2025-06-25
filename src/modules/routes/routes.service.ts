@@ -1060,4 +1060,19 @@ export class RoutesService {
       throw new InternalServerErrorException('Không thể lấy danh sách yêu cầu');
     }
   }
+
+  async getBookinHistory(userId: string) {
+    try {
+      const booking = await this.passengerModel
+        .find({
+          userId,
+        })
+        .populate('userId')
+        .populate('routeId')
+        .exec();
+      return booking || [];
+    } catch (error) {
+      console.error('Lỗi khi lấy lịch sử đặt chuyến đi');
+    }
+  }
 }

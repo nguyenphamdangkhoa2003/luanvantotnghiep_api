@@ -102,10 +102,6 @@ export class RoutesController {
     const userId = req.user._id;
     return this.routesService.cancelBooking(userId, cancelBookingDto);
   }
-  // @Post('generate')
-  // async generateRoutes() {
-  //   return this.routesService.generateRoutes(1000);
-  // }
 
   @Get('passenger/:userId')
   async getRoutesByPassenger(@Param('userId') userId: string) {
@@ -116,5 +112,11 @@ export class RoutesController {
   @Get('requests/user/:userId')
   async getRequestsByUserId(@Param('userId') userId: string) {
     return this.routesService.getRequestsByUserId(userId);
+  }
+
+  @Get('history/booking')
+  async getBookingHistory(@Req() req: AuthRequest) {
+    const userId = req.user._id;
+    return this, this.routesService.getBookinHistory(userId);
   }
 }
