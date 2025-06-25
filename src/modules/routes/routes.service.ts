@@ -688,7 +688,7 @@ export class RoutesService {
     }
 
     // Kiểm tra xem hành khách có phải là người tạo yêu cầu không
-    if (request.userId.toString() !== userId) {
+    if (request.userId !== userId.toString()) {
       throw new BadRequestException(
         'You do not have the right to cancel this request.',
       );
@@ -738,6 +738,7 @@ export class RoutesService {
       'Reservation Request Cancelled',
       'booking-cancelled',
       {
+        driverName: driver.name, // thêm dòng này
         routeName: route.name,
         passengerName: request.userId.name,
         cancelDate: new Date().toISOString().split('T')[0],
