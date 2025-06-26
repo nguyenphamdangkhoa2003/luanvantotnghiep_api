@@ -597,7 +597,6 @@ export class RoutesService {
       .populate('userId', 'name email')
       .populate('requestId')
       .exec();
-    console.log(passengers);
     return passengers.map((passenger) => {
       const user = passenger.userId as any;
       const request = passenger as any;
@@ -1068,7 +1067,10 @@ export class RoutesService {
           userId,
         })
         .populate('userId')
-        .populate('routeId')
+        .populate({
+          path: 'routeId',
+          populate: [{ path: 'userId' }],
+        })
         .populate('requestId')
         .exec();
       return booking || [];
