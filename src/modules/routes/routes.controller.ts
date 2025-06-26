@@ -79,6 +79,8 @@ export class RoutesController {
     return route;
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.DRIVER)
   @Patch(':id/complete')
   async completeTrip(@Param('id') id: string, @Req() req: AuthRequest) {
     return this.routesService.completeTrip(id, req.user._id);

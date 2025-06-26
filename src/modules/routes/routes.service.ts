@@ -606,7 +606,7 @@ export class RoutesService {
         userId: user._id.toString(),
         name: user.name,
         email: user.email,
-        requestId: request._id.toString(),
+        request: request,
         message: request.message,
         createdAt: request.createdAt,
       };
@@ -749,7 +749,8 @@ export class RoutesService {
     return request;
   }
 
-  async completeTrip(tripRequestId: string, userId: string) {
+  async completeTrip(tripRequestId: string, driverId: string) {
+    // Tìm request và populate route để lấy userId của tài xế
     const tripRequest = (await this.requestModel
       .findById(tripRequestId)
       .populate('routeId')) as any;
@@ -757,14 +758,13 @@ export class RoutesService {
     if (!tripRequest) {
       throw new BadRequestException('Yêu cầu chuyến đi không tồn tại');
     }
-    tripRequest.routeId = tripRequest.routeId as Route;
 
-    if (
-      tripRequest.userId.toString() !== userId &&
-      tripRequest.routeId.userId.toString() !== userId
-    ) {
+    const route = tripRequest.routeId as Route;
+
+    // Chỉ tài xế của route mới được quyền xác nhận hoàn tất chuyến đi
+    if (route.userId.toString() !== driverId) {
       throw new BadRequestException(
-        'You are not authorized to confirm this trip.',
+        'Bạn không có quyền hoàn tất chuyến đi này (chỉ tài xế mới được phép)',
       );
     }
 
@@ -774,8 +774,10 @@ export class RoutesService {
       );
     }
 
+    // Cập nhật trạng thái sang 'completed'
     tripRequest.status = 'completed';
     tripRequest.completedAt = new Date();
+
     await tripRequest.save();
 
     return tripRequest;
