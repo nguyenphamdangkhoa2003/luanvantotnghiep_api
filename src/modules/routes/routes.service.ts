@@ -595,7 +595,7 @@ export class RoutesService {
     const passengers = await this.passengerModel
       .find({ routeId })
       .populate('userId', 'name email')
-      .populate('requestId', 'message createdAt')
+      .populate('requestId')
       .exec();
     console.log(passengers);
     return passengers.map((passenger) => {
@@ -1069,6 +1069,7 @@ export class RoutesService {
         })
         .populate('userId')
         .populate('routeId')
+        .populate('requestId')
         .exec();
       return booking || [];
     } catch (error) {
