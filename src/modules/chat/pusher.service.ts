@@ -14,13 +14,6 @@ export class PusherService {
       cluster: this.configService.getOrThrow<string>('pusher.cluster'),
       useTLS: true,
     });
-
-    console.log('Pusher Config:', {
-      appId: this.configService.getOrThrow<string>('pusher.app_id'),
-      key: this.configService.getOrThrow<string>('pusher.key'),
-      secret: this.configService.getOrThrow<string>('pusher.secret'),
-      cluster: this.configService.getOrThrow<string>('pusher.cluster'),
-    });
   }
 
   async trigger(channel: string, event: string, data: any): Promise<void> {

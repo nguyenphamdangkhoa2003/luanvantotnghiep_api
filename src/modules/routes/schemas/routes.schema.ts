@@ -5,7 +5,7 @@ export type RouteDocument = HydratedDocument<Route>;
 
 @Schema()
 export class Waypoint {
-  @Prop({ type: [Number], required: true }) 
+  @Prop({ type: [Number], required: true })
   coordinates: [number, number];
 
   @Prop({ type: Number, required: true })
@@ -18,10 +18,10 @@ export class Waypoint {
 @Schema()
 export class Route {
   @Prop({ required: true, ref: 'User' })
-  userId: string; 
+  userId: string;
 
   @Prop({ required: true })
-  name: string; 
+  name: string;
 
   @Prop({
     type: {
@@ -30,11 +30,11 @@ export class Route {
       required: true,
     },
     coordinates: {
-      type: [Number], 
+      type: [Number],
       required: true,
     },
   })
-  startPoint: { type: string; coordinates: [number, number] }; 
+  startPoint: { type: string; coordinates: [number, number] };
 
   @Prop({
     type: {
@@ -43,11 +43,11 @@ export class Route {
       required: true,
     },
     coordinates: {
-      type: [Number], 
+      type: [Number],
       required: true,
     },
   })
-  endPoint: { type: string; coordinates: [number, number] }; 
+  endPoint: { type: string; coordinates: [number, number] };
 
   @Prop({ type: [Waypoint], default: [] })
   waypoints: Waypoint[];
@@ -59,11 +59,11 @@ export class Route {
       required: true,
     },
     coordinates: {
-      type: [[Number]], 
+      type: [[Number]],
       required: true,
     },
   })
-  path: { type: string; coordinates: [number, number][] }; 
+  path: { type: string; coordinates: [number, number][] };
 
   @Prop({ required: true })
   distance: number;
@@ -72,21 +72,21 @@ export class Route {
   duration: number;
 
   @Prop({ required: true })
-  frequency: string; 
-
-  @Prop({ required: true })
   startTime: Date;
 
   @Prop({ required: true })
-  seatsAvailable: number; 
+  endTime: Date;
 
   @Prop({ required: true })
-  price: number; 
+  seatsAvailable: number;
+
+  @Prop({ required: true })
+  price: number;
 
   @Prop({ default: 'active' })
-  status: string; 
+  status: string;
 
-  @Prop({ type: Number, default: 0 }) 
+  @Prop({ type: Number, default: 0 })
   routeIndex: number;
 
   @Prop({

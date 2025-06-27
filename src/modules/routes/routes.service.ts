@@ -128,7 +128,6 @@ export class RoutesService {
     this.mapboxAccessToken = configService.getOrThrow<string>(
       'mapbox_access_token',
     );
-    console.log(this.mapboxAccessToken);
   }
   private simplifyPath(
     coordinates: [number, number][],
@@ -151,8 +150,38 @@ export class RoutesService {
         path,
         distance,
         duration,
+        startTime,
+        endTime,
         ...rest
       } = createRouteDto;
+
+      const conflictRoute = await this.routeModel.findOne({
+        userId,
+        status: 'active', // chỉ kiểm tra với tuyến đang hoạt động
+        $or: [
+          {
+            // startTime của tuyến mới nằm trong khoảng thời gian của tuyến cũ
+            startTime: { $lte: startTime },
+            endTime: { $gte: startTime },
+          },
+          {
+            // endTime của tuyến mới nằm trong khoảng thời gian của tuyến cũ
+            startTime: { $lte: endTime },
+            endTime: { $gte: endTime },
+          },
+          {
+            // Tuyến mới bao trùm tuyến cũ
+            startTime: { $gte: startTime },
+            endTime: { $lte: endTime },
+          },
+        ],
+      });
+
+      if (conflictRoute) {
+        throw new BadRequestException(
+          'Bạn đã có một tuyến đường trùng thời gian với tuyến đường này.',
+        );
+      }
 
       // Ánh xạ WaypointDto sang Waypoint
       const mappedWaypoints =
@@ -190,6 +219,8 @@ export class RoutesService {
       const route = new this.routeModel({
         userId,
         ...rest,
+        startTime,
+        endTime,
         startPoint: {
           type: 'Point',
           coordinates: [startCoords.lng, startCoords.lat],
@@ -243,7 +274,6 @@ export class RoutesService {
 
   private buildQuery({
     name,
-    frequency,
     seatsAvailable,
     priceRange,
     status,
@@ -253,10 +283,6 @@ export class RoutesService {
 
     if (name) {
       query.name = { $regex: name, $options: 'i' };
-    }
-
-    if (frequency) {
-      query.frequency = frequency;
     }
 
     if (seatsAvailable !== undefined) {
@@ -468,9 +494,7 @@ export class RoutesService {
           .exec();
         if (!requestUser) throw new NotFoundException('User request not found');
 
-        // Xử lý hành động
         if (action === 'accept') {
-          // Kiểm tra gói thành viên
           const membership = await this.membershipService.getMembershipInfo(
             user._id.toString(),
           );
@@ -493,7 +517,7 @@ export class RoutesService {
           if (route.seatsAvailable <= 0) {
             throw new ForbiddenException('No seats available');
           }
-          route.seatsAvailable -= 1;
+          route.seatsAvailable -= request.seats;
           await route.save({ session });
 
           // Trừ lượt chấp nhận (nếu không phải gói Pro)
@@ -600,8 +624,6 @@ export class RoutesService {
     return passengers.map((passenger) => {
       const user = passenger.userId as any;
       const request = passenger as any;
-      console.log('user', user);
-      console.log('request', request);
       return {
         userId: user._id.toString(),
         name: user.name,
@@ -705,9 +727,14 @@ export class RoutesService {
     // Kiểm tra thời gian khởi hành
     const route = request.routeId as Route;
     const now = new Date();
-    if (new Date(route.startTime) < now) {
+    if (new Date(route.endTime) < now) {
       throw new BadRequestException(
-        'Cancellation is not possible because the trip has started or ended.',
+        'Cancellation is not possible because the trip has already ended.',
+      );
+    }
+    if (new Date(route.startTime) <= now) {
+      throw new BadRequestException(
+        'You cannot cancel a booking that has already started.',
       );
     }
 
@@ -799,10 +826,7 @@ export class RoutesService {
         continue;
       }
 
-      const durationInMs = route.duration * 60 * 1000;
-      const expectedCompletionTime = new Date(
-        new Date(route.startTime).getTime() + durationInMs,
-      );
+      const expectedCompletionTime = new Date(route.endTime);
 
       if (now > expectedCompletionTime) {
         await this.requestModel.updateOne(
@@ -861,82 +885,82 @@ export class RoutesService {
     throw new Error('Mapbox API: Max retries reached');
   }
 
-  private async generateRoute(index: number): Promise<Route> {
-    const startLocation = this.getRandomItem(this.locations);
-    let endLocation = this.getRandomItem(this.locations);
-    while (endLocation.name === startLocation.name) {
-      endLocation = this.getRandomItem(this.locations);
-    }
+  // private async generateRoute(index: number): Promise<Route> {
+  //   const startLocation = this.getRandomItem(this.locations);
+  //   let endLocation = this.getRandomItem(this.locations);
+  //   while (endLocation.name === startLocation.name) {
+  //     endLocation = this.getRandomItem(this.locations);
+  //   }
 
-    // Chọn 0-2 waypoints ngẫu nhiên
-    const waypointCount = faker.number.int({ min: 0, max: 2 });
-    const waypointLocations: Location[] = [];
-    for (let i = 0; i < waypointCount; i++) {
-      let waypoint = this.getRandomItem(this.locations);
-      while (
-        waypoint.name === startLocation.name ||
-        waypoint.name === endLocation.name ||
-        waypointLocations.some((w) => w.name === waypoint.name)
-      ) {
-        waypoint = this.getRandomItem(this.locations);
-      }
-      waypointLocations.push(waypoint);
-    }
+  //   // Chọn 0-2 waypoints ngẫu nhiên
+  //   const waypointCount = faker.number.int({ min: 0, max: 2 });
+  //   const waypointLocations: Location[] = [];
+  //   for (let i = 0; i < waypointCount; i++) {
+  //     let waypoint = this.getRandomItem(this.locations);
+  //     while (
+  //       waypoint.name === startLocation.name ||
+  //       waypoint.name === endLocation.name ||
+  //       waypointLocations.some((w) => w.name === waypoint.name)
+  //     ) {
+  //       waypoint = this.getRandomItem(this.locations);
+  //     }
+  //     waypointLocations.push(waypoint);
+  //   }
 
-    // Lấy dữ liệu từ Mapbox
-    const { distance, duration, path } = await this.getRouteData(
-      startLocation.coordinates,
-      endLocation.coordinates,
-      waypointLocations.map((w) => w.coordinates),
-    );
+  //   // Lấy dữ liệu từ Mapbox
+  //   const { distance, duration, path } = await this.getRouteData(
+  //     startLocation.coordinates,
+  //     endLocation.coordinates,
+  //     waypointLocations.map((w) => w.coordinates),
+  //   );
 
-    // Tạo waypoints cho schema
-    let totalDistance = 0;
-    const waypointData = waypointLocations.map((loc, idx) => {
-      totalDistance +=
-        idx === 0
-          ? distance / (waypointCount + 1)
-          : distance / (waypointCount + 1);
-      return {
-        coordinates: loc.coordinates,
-        distance: totalDistance,
-        name: loc.name,
-      };
-    });
+  //   // Tạo waypoints cho schema
+  //   let totalDistance = 0;
+  //   const waypointData = waypointLocations.map((loc, idx) => {
+  //     totalDistance +=
+  //       idx === 0
+  //         ? distance / (waypointCount + 1)
+  //         : distance / (waypointCount + 1);
+  //     return {
+  //       coordinates: loc.coordinates,
+  //       distance: totalDistance,
+  //       name: loc.name,
+  //     };
+  //   });
 
-    // Sinh các giá trị khác
-    const price = Math.round(
-      distance * faker.number.int({ min: 500, max: 1000 }),
-    ); // 500-1000 VND/km
-    const seatsAvailable = faker.number.int({ min: 10, max: 50 });
-    const frequency = faker.helpers.arrayElement([
-      'daily',
-      'weekly',
-      'monthly',
-    ]);
-    const startTime = faker.date.soon({ days: 30 });
+  //   // Sinh các giá trị khác
+  //   const price = Math.round(
+  //     distance * faker.number.int({ min: 500, max: 1000 }),
+  //   ); // 500-1000 VND/km
+  //   const seatsAvailable = faker.number.int({ min: 10, max: 50 });
+  //   const frequency = faker.helpers.arrayElement([
+  //     'daily',
+  //     'weekly',
+  //     'monthly',
+  //   ]);
+  //   const startTime = faker.date.soon({ days: 30 });
 
-    return {
-      userId: faker.database.mongodbObjectId(),
-      name: `${startLocation.name} - ${endLocation.name}`,
-      startPoint: { type: 'Point', coordinates: startLocation.coordinates },
-      endPoint: { type: 'Point', coordinates: endLocation.coordinates },
-      waypoints: waypointData,
-      path: { type: 'LineString', coordinates: path },
-      simplifiedPath: {
-        type: 'LineString',
-        coordinates: [startLocation.coordinates, endLocation.coordinates],
-      },
-      distance,
-      duration,
-      frequency,
-      startTime,
-      seatsAvailable,
-      price,
-      status: 'active',
-      routeIndex: index,
-    };
-  }
+  //   return {
+  //     userId: faker.database.mongodbObjectId(),
+  //     name: `${startLocation.name} - ${endLocation.name}`,
+  //     startPoint: { type: 'Point', coordinates: startLocation.coordinates },
+  //     endPoint: { type: 'Point', coordinates: endLocation.coordinates },
+  //     waypoints: waypointData,
+  //     path: { type: 'LineString', coordinates: path },
+  //     simplifiedPath: {
+  //       type: 'LineString',
+  //       coordinates: [startLocation.coordinates, endLocation.coordinates],
+  //     },
+  //     distance,
+  //     duration,
+  //     frequency,
+  //     startTime,
+  //     seatsAvailable,
+  //     price,
+  //     status: 'active',
+  //     routeIndex: index,
+  //   };
+  // }
 
   // Chọn ngẫu nhiên phần tử từ mảng
   private getRandomItem<T>(array: T[]): T {
@@ -944,28 +968,30 @@ export class RoutesService {
   }
 
   // Tạo 1000 tuyến đường
-  async generateRoutes(count: number = 1000): Promise<{ message: string }> {
-    const batchSize = 100;
-    const routes: Route[] = [];
+  // async generateRoutes(count: number = 1000): Promise<{ message: string }> {
+  //   const batchSize = 100;
+  //   const routes: Route[] = [];
 
-    for (let i = 0; i < count; i++) {
-      const route = await this.generateRoute(i + 1);
-      routes.push(route);
+  //   for (let i = 0; i < count; i++) {
+  //     const route = await this.generateRoute(i + 1);
+  //     routes.push(route);
 
-      // Chèn theo batch
-      if (routes.length === batchSize || i === count - 1) {
-        try {
-          await this.routeModel.insertMany(routes, { ordered: false });
-          console.log(`Đã chèn ${i + 1} tuyến đường`);
-        } catch (error) {
-          console.error(`Lỗi khi chèn batch ${i + 1}:`, error);
-        }
-        routes.length = 0; // Xóa batch
-      }
-    }
+  //     // Chèn theo batch
+  //     if (routes.length === batchSize || i === count - 1) {
+  //       try {
+  //         await this.routeModel.insertMany(routes, { ordered: false });
+  //         console.log(`Đã chèn ${i + 1} tuyến đường`);
+  //       } catch (error) {
+  //         console.error(`Lỗi khi chèn batch ${i + 1}:`, error);
+  //       }
+  //       routes.length = 0; // Xóa batch
+  //     }
+  //   }
 
-    return { message: `Đã tạo ${count} tuyến đường thành công` };
-  }
+  //   return { message: `Đã tạo ${count} tuyến đường thành công` };
+  // }
+
+  //================================ *** SEED DATA *** ================================
 
   async getRoutesByDriver(userId: string): Promise<Route[]> {
     const routes = await this.routeModel.find({ userId }).exec();

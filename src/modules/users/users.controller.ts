@@ -154,7 +154,6 @@ export class UsersController {
     },
     @Body() uploadDocumentDto: UploadDocumentDto,
   ) {
-    console.log(files);
     if (!files.frontFile?.[0] || !files.backFile?.[0]) {
       throw new BadRequestException(
         'Both front and back files must be provided.',

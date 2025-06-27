@@ -47,8 +47,6 @@ export class VnPayService {
       vnp_ExpireDate: this.formatDate(expire),
     };
 
-    console.log('vnpParams:', vnpParams); // Debug
-
     const sortedParams = this.sortObject(vnpParams);
     const queryString = new URLSearchParams(sortedParams).toString();
     const secureHash = crypto
@@ -76,9 +74,6 @@ export class VnPayService {
       .createHmac('sha512', this.vnpHashSecret)
       .update(queryString)
       .digest('hex');
-
-    console.log('Calculated hash:', calculatedHash);
-    console.log('Received hash:', secureHash);
 
     return secureHash === calculatedHash && data.vnp_ResponseCode === '00';
   }

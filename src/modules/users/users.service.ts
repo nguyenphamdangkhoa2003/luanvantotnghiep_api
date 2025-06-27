@@ -519,9 +519,7 @@ export class UsersService {
       )
       .select('email driverLicense identityDocument');
 
-    console.log('updatedUser', updatedUser);
 
-    // Chuẩn bị email
     const emailSubject = `${type === 'driverLicense' ? 'Driver License' : 'Identity Document'} Verification ${
       isApproved ? 'Approved' : 'Rejected'
     }`;
@@ -529,7 +527,6 @@ export class UsersService {
       ? 'document_approved'
       : 'document_rejected';
 
-    // Gửi email thông báo
     await this.mailService.sendMail(user.email, emailSubject, emailTemplate, {
       name: user.name,
       email: user.email,
