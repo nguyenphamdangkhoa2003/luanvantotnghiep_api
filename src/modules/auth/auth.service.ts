@@ -304,8 +304,6 @@ export class AuthService {
         this.cacheManager.set(`blacklist:${userId}:${tokenId}`, now, ttl),
       );
     }
-
-    console.log(`blacklist:${userId}:${tokenId}`);
   }
 
   public async resetPasswordEmail(

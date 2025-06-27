@@ -35,7 +35,6 @@ export class RoutesController {
     @Body() createRouteDto: CreateRouteDto,
   ) {
     const userId = req.user.id;
-    console.log('createRouteDto', createRouteDto);
     return this.routesService.create(userId, createRouteDto);
   }
 

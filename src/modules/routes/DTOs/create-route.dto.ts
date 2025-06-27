@@ -66,13 +66,13 @@ export class CreateRouteDto {
   @IsOptional()
   waypoints?: WaypointDto[];
 
-  @IsString()
-  @IsNotEmpty()
-  frequency: string;
-
   @IsDate()
   @Type(() => Date)
   startTime: Date;
+
+  @IsDate()
+  @Type(() => Date)
+  endTime: Date;
 
   @IsInt()
   @IsPositive()
