@@ -8,6 +8,7 @@ import {
   UseGuards,
   Param,
   Patch,
+  Delete,
 } from '@nestjs/common';
 import { RoutesService } from './routes.service';
 import { CreateRouteDto } from '@/modules/routes/DTOs/create-route.dto';
@@ -22,6 +23,7 @@ import { HandleRequestDto } from '@/modules/routes/DTOs/handle-request.dto';
 import { GetPassengersDto } from '@/modules/routes/DTOs/get-passengers.dto';
 import { Public } from '@/modules/auth/decorators/public.decorators';
 import { CancelRequestDto } from '@/modules/routes/DTOs/cancel-request.dto';
+import { UpdateRouteDto } from '@/modules/routes/DTOs/update-route.dto';
 
 @Controller('routes')
 export class RoutesController {
@@ -119,5 +121,21 @@ export class RoutesController {
   async getBookingHistory(@Req() req: AuthRequest) {
     const userId = req.user._id;
     return this, this.routesService.getBookinHistory(userId);
+  }
+
+  @Patch(':id')
+  updateRoute(
+    @Req() req: AuthRequest,
+    @Param('id') routeId: string,
+    @Body() dto: UpdateRouteDto,
+  ) {
+    const user = req.user;
+    return this.routesService.updateRoute(user._id.toString(), routeId, dto);
+  }
+
+  @Delete(':id')
+  deleteRoute(@Req() req: AuthRequest, @Param('id') routeId: string) {
+    const user = req.user;
+    return this.routesService.deleteRoute(user._id.toString(), routeId);
   }
 }

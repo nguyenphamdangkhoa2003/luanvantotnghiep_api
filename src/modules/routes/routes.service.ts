@@ -36,6 +36,7 @@ import { MembershipPackageType } from '@/common/enums/membership-package-type.en
 import { CancelRequestDto } from '@/modules/routes/DTOs/cancel-request.dto';
 import simplify from 'simplify-js';
 import * as turf from '@turf/turf';
+import { UpdateRouteDto } from '@/modules/routes/DTOs/update-route.dto';
 interface Location {
   name: string;
   coordinates: [number, number]; // Tuple thay vì number[]
@@ -1105,5 +1106,74 @@ export class RoutesService {
     } catch (error) {
       console.error('Lỗi khi lấy lịch sử đặt chuyến đi');
     }
+  }
+
+  async updateRoute(
+    userId: string,
+    routeId: string,
+    dto: UpdateRouteDto,
+  ): Promise<Route> {
+    const route = await this.routeModel.findById(routeId);
+    if (!route) throw new NotFoundException('Route not found');
+
+    if (route.userId.toString() !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to edit this route',
+      );
+    }
+
+    // Không cho sửa nếu chuyến đã bắt đầu
+    if (new Date(route.startTime) <= new Date()) {
+      throw new BadRequestException(
+        'Cannot update a route that has already started',
+      );
+    }
+
+    // Áp dụng các thay đổi hợp lệ
+    Object.assign(route, dto);
+
+    // Đảm bảo endTime > startTime
+    if (route.endTime <= route.startTime) {
+      throw new BadRequestException('endTime must be greater than startTime');
+    }
+
+    return await route.save();
+  }
+
+  async deleteRoute(
+    userId: string,
+    routeId: string,
+  ): Promise<{ message: string }> {
+    const route = await this.routeModel.findById(routeId);
+    if (!route) throw new NotFoundException('Route not found');
+
+    if (route.userId.toString() !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to delete this route',
+      );
+    }
+
+    if (new Date(route.startTime) <= new Date()) {
+      throw new BadRequestException(
+        'Cannot delete a route that has already started',
+      );
+    }
+
+    // Kiểm tra xem đã có hành khách tham gia chưa
+    const requests = await this.requestModel.find({
+      routeId: route._id,
+      status: { $in: ['accepted', 'completed'] },
+    });
+
+    if (requests.length > 0) {
+      throw new BadRequestException(
+        'Cannot delete route with existing accepted passengers',
+      );
+    }
+
+    await this.routeModel.findByIdAndDelete(routeId);
+    await this.requestModel.deleteMany({ routeId }); 
+
+    return { message: 'Route deleted successfully' };
   }
 }
