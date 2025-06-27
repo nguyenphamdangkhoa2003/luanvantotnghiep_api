@@ -790,7 +790,7 @@ export class RoutesService {
     const route = tripRequest.routeId as Route;
 
     // Chỉ tài xế của route mới được quyền xác nhận hoàn tất chuyến đi
-    if (route.userId.toString() !== driverId) {
+    if (route.userId.toString() !== driverId.toString()) {
       throw new BadRequestException(
         'Bạn không có quyền hoàn tất chuyến đi này (chỉ tài xế mới được phép)',
       );
@@ -1172,7 +1172,7 @@ export class RoutesService {
     }
 
     await this.routeModel.findByIdAndDelete(routeId);
-    await this.requestModel.deleteMany({ routeId }); 
+    await this.requestModel.deleteMany({ routeId });
 
     return { message: 'Route deleted successfully' };
   }
