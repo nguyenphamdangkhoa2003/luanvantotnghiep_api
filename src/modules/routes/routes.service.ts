@@ -37,6 +37,10 @@ import { CancelRequestDto } from '@/modules/routes/DTOs/cancel-request.dto';
 import simplify from 'simplify-js';
 import * as turf from '@turf/turf';
 import { UpdateRouteDto } from '@/modules/routes/DTOs/update-route.dto';
+import {
+  TripConfirmation,
+  TripConfirmationDocument,
+} from '@/modules/trip-confirmations/Schemas/trip-confirmation.schema';
 interface Location {
   name: string;
   coordinates: [number, number]; // Tuple thay vì number[]
@@ -115,6 +119,8 @@ export class RoutesService {
     { name: 'Yên Bái', coordinates: [104.8752, 21.7049] },
   ];
   constructor(
+    @InjectModel(TripConfirmation.name)
+    private readonly tripConfirmationModel: Model<TripConfirmationDocument>,
     @InjectModel(Route.name) private routeModel: Model<RouteDocument>,
     @InjectModel(Request.name) private requestModel: Model<RequestDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
@@ -529,12 +535,25 @@ export class RoutesService {
               { session },
             );
           }
+
           const passenger = new this.passengerModel({
             userId: request.userId,
             routeId: request.routeId,
             requestId: request._id,
           });
           await passenger.save({ session });
+
+          // ✅ Tạo TripConfirmation
+          await this.tripConfirmationModel.create(
+            [
+              {
+                tripRequestId: request._id,
+                confirmedByDriver: true,
+                confirmedByPassenger: false, // hành khách xác nhận sau
+              },
+            ],
+            { session },
+          );
 
           // Gửi thông báo in-app
           const message = `Your request to join route "${route.name}" has been accepted.`;
@@ -558,6 +577,7 @@ export class RoutesService {
               appUrl: 'https://xeshare.com/',
             },
           );
+
           await this.chatService.createConversation(
             requestId,
             route.userId,

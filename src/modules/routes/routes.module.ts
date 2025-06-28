@@ -36,12 +36,17 @@ import {
   PackageSchema,
 } from '@/modules/membership/schemas/package.schema';
 import { PusherService } from '@/modules/chat/pusher.service';
+import {
+  TripConfirmation,
+  TripConfirmationSchema,
+} from '@/modules/trip-confirmations/Schemas/trip-confirmation.schema';
 
 @Module({
   imports: [
     ChatModule,
     MailModule,
     MongooseModule.forFeature([
+      { name: TripConfirmation.name, schema: TripConfirmationSchema },
       { name: Route.name, schema: RouteSchema },
       { name: Request.name, schema: RequestSchema },
       { name: Notification.name, schema: NotificationSchema },
