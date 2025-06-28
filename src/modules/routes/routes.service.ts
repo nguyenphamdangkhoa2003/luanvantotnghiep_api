@@ -1134,7 +1134,9 @@ export class RoutesService {
     dto: UpdateRouteDto,
   ): Promise<Route> {
     const route = await this.routeModel.findById(routeId);
-    if (!route) throw new NotFoundException('Route not found');
+    if (!route) {
+      throw new NotFoundException('Route not found');
+    }
 
     if (route.userId.toString() !== userId) {
       throw new ForbiddenException(
@@ -1146,6 +1148,17 @@ export class RoutesService {
     if (new Date(route.startTime) <= new Date()) {
       throw new BadRequestException(
         'Cannot update a route that has already started',
+      );
+    }
+
+    // Kiểm tra nếu đã có hành khách thì không cho phép cập nhật
+    const passengerCount = await this.passengerModel.countDocuments({
+      routeId: route._id,
+    });
+
+    if (passengerCount > 0) {
+      throw new BadRequestException(
+        'Cannot update a route that already has passengers',
       );
     }
 

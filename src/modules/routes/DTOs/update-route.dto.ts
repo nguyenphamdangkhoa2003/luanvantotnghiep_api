@@ -4,8 +4,10 @@ import {
   IsNumber,
   IsDateString,
   ValidateNested,
+  IsArray,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { WaypointDto } from '@/modules/routes/DTOs/create-route.dto';
 
 export class UpdateRouteDto {
   @IsOptional()
@@ -27,4 +29,10 @@ export class UpdateRouteDto {
   @IsOptional()
   @IsNumber()
   seatsAvailable?: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => WaypointDto)
+  @IsOptional()
+  waypoints?: WaypointDto[];
 }
