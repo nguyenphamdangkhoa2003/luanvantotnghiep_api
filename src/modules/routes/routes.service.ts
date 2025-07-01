@@ -1151,24 +1151,115 @@ export class RoutesService {
       );
     }
 
-    // Kiểm tra nếu đã có hành khách thì không cho phép cập nhật
+    // Không cho sửa nếu đã có hành khách
     const passengerCount = await this.passengerModel.countDocuments({
       routeId: route._id,
     });
-
     if (passengerCount > 0) {
       throw new BadRequestException(
         'Cannot update a route that already has passengers',
       );
     }
 
-    // Áp dụng các thay đổi hợp lệ
-    Object.assign(route, dto);
+    // Lấy các giá trị mới hoặc giữ nguyên nếu không có
+    const {
+      startTime = route.startTime,
+      endTime = route.endTime,
+      startCoords = route.startPoint?.coordinates && {
+        lng: route.startPoint.coordinates[0],
+        lat: route.startPoint.coordinates[1],
+      },
+      endCoords = route.endPoint?.coordinates && {
+        lng: route.endPoint.coordinates[0],
+        lat: route.endPoint.coordinates[1],
+      },
+      path = route.path,
+      waypoints = route.waypoints,
+      ...rest
+    } = dto as any; // dùng any nếu DTO chưa đầy đủ các thuộc tính
 
-    // Đảm bảo endTime > startTime
-    if (route.endTime <= route.startTime) {
+    // Kiểm tra xung đột tuyến
+    const conflictRoute = await this.routeModel.findOne({
+      _id: { $ne: routeId },
+      userId,
+      status: 'active',
+      $or: [
+        {
+          startTime: { $lte: startTime },
+          endTime: { $gte: startTime },
+        },
+        {
+          startTime: { $lte: endTime },
+          endTime: { $gte: endTime },
+        },
+        {
+          startTime: { $gte: startTime },
+          endTime: { $lte: endTime },
+        },
+      ],
+    });
+
+    if (conflictRoute) {
+      throw new BadRequestException(
+        'Bạn đã có một tuyến đường trùng thời gian với tuyến đường này.',
+      );
+    }
+
+    // Đảm bảo thời gian hợp lệ
+    if (endTime <= startTime) {
       throw new BadRequestException('endTime must be greater than startTime');
     }
+
+    // Xử lý waypoint nếu có
+    let mappedWaypoints = route.waypoints;
+    if (waypoints) {
+      mappedWaypoints = waypoints.map((waypoint) => {
+        if (
+          !waypoint.location ||
+          typeof waypoint.location.lng !== 'number' ||
+          typeof waypoint.location.lat !== 'number'
+        ) {
+          throw new BadRequestException(
+            'Waypoint location phải có lng và lat hợp lệ',
+          );
+        }
+        return {
+          coordinates: [waypoint.location.lng, waypoint.location.lat],
+          distance: waypoint.distance,
+          name: waypoint.name,
+        };
+      });
+    }
+
+    // Rút gọn path nếu có
+    let simplifiedPath = path;
+    if (path?.coordinates) {
+      simplifiedPath = {
+        ...path,
+        coordinates: this.simplifyPath(path.coordinates as [number, number][]),
+      };
+      console.log(
+        `Path reduced from ${path.coordinates.length} to ${simplifiedPath.coordinates.length} points`,
+      );
+    }
+
+    // Gán lại toàn bộ giá trị
+    Object.assign(route, {
+      ...rest,
+      startTime,
+      endTime,
+      startPoint: startCoords && {
+        type: 'Point',
+        coordinates: [startCoords.lng, startCoords.lat],
+      },
+      endPoint: endCoords && {
+        type: 'Point',
+        coordinates: [endCoords.lng, endCoords.lat],
+      },
+      waypoints: mappedWaypoints,
+      path,
+      simplifiedPath,
+    });
 
     return await route.save();
   }
