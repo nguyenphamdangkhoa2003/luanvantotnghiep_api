@@ -708,9 +708,21 @@ export class RoutesService {
       .findById(routeId)
       .populate('userId')
       .exec();
-    if (!route)
-      return new NotFoundException('Route by id: ' + routeId + ' not found');
-    return route;
+
+    if (!route) {
+      throw new NotFoundException('Route by id: ' + routeId + ' not found');
+    }
+
+    // Đếm số lượng hành khách đã tham gia tuyến
+    const passengerCount = await this.passengerModel.countDocuments({
+      routeId: route._id,
+    });
+
+    // Trả về object gồm thông tin route và số hành khách
+    return {
+      ...route.toObject(),
+      passengerCount,
+    };
   }
 
   async cancelBooking(
