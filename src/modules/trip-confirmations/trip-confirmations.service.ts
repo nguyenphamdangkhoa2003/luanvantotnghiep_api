@@ -1,9 +1,12 @@
 import { CreateTripConfirmationDto } from '@/modules/trip-confirmations/DTOs/create-trip-confirmation.dto';
 import { UpdateTripConfirmationDto } from '@/modules/trip-confirmations/DTOs/update-trip-confirmation.dto';
-import { TripConfirmation, TripConfirmationDocument } from '@/modules/trip-confirmations/Schemas/trip-confirmation.schema';
+import {
+  TripConfirmation,
+  TripConfirmationDocument,
+} from '@/modules/trip-confirmations/Schemas/trip-confirmation.schema';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 
 @Injectable()
 export class TripConfirmationsService {
@@ -17,7 +20,10 @@ export class TripConfirmationsService {
   }
 
   async findByRequest(tripRequestId: string): Promise<TripConfirmation | null> {
-    return this.confirmationModel.findOne({ tripRequestId });
+    console.log(tripRequestId);
+    return this.confirmationModel.findOne({
+      tripRequestId: new Types.ObjectId(tripRequestId),
+    });
   }
 
   async update(
