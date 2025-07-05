@@ -548,8 +548,8 @@ export class RoutesService {
             [
               {
                 tripRequestId: request._id,
-                confirmedByDriver: true,
-                confirmedByPassenger: false, // hành khách xác nhận sau
+                confirmedByDriver: false,
+                confirmedByPassenger: false,
               },
             ],
             { session },
