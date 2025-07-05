@@ -13,6 +13,10 @@ export class Waypoint {
 
   @Prop({ type: String, required: true })
   name: string;
+
+  // ⏱️ Thêm thuộc tính thời gian ước lượng đến waypoint này
+  @Prop({ type: Date, required: false })
+  estimatedArrivalTime?: Date;
 }
 
 @Schema()
@@ -94,6 +98,10 @@ export class Route {
     coordinates: { type: [[Number]], required: true },
   })
   simplifiedPath: { type: string; coordinates: [number, number][] };
+
+  // 👤 Khoảng cách tối đa tài xế có thể rước người ngoài tuyến (tính bằng km)
+  @Prop({ type: Number, default: 5 }) // ví dụ mặc định 5km
+  maxPickupDistance: number;
 }
 
 export const RouteSchema = SchemaFactory.createForClass(Route);

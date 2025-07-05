@@ -19,6 +19,7 @@ export class Point {
   @IsNumber()
   lat: number;
 }
+
 class RoutePath {
   @IsArray()
   coordinates: number[][];
@@ -39,6 +40,12 @@ export class WaypointDto {
   @ValidateNested()
   @Type(() => Point)
   location: Point;
+
+  // (Tùy chọn) thời điểm đến waypoint nếu cần lịch trình cụ thể
+  @IsDate()
+  @Type(() => Date)
+  @IsOptional()
+  estimatedArrivalTime?: Date;
 }
 
 export class CreateRouteDto {
@@ -50,14 +57,16 @@ export class CreateRouteDto {
   @IsNotEmpty()
   startAddress: string;
 
-  @IsNotEmpty()
+  @ValidateNested()
+  @Type(() => Point)
   startCoords: Point;
 
   @IsString()
   @IsNotEmpty()
   endAddress: string;
 
-  @IsNotEmpty()
+  @ValidateNested()
+  @Type(() => Point)
   endCoords: Point;
 
   @IsArray()
@@ -99,4 +108,10 @@ export class CreateRouteDto {
   @IsNumber()
   @IsPositive()
   duration: number;
+
+  // 🚗 Khoảng cách tối đa tài xế sẵn sàng rước hành khách ngoài tuyến (km)
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  maxPickupDistance?: number;
 }

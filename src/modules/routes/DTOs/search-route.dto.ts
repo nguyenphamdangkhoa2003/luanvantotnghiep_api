@@ -4,7 +4,6 @@ import {
   IsNumber,
   IsDateString,
   Min,
-  IsNotEmpty,
   Max,
   ValidateNested,
 } from 'class-validator';
@@ -45,11 +44,10 @@ export class SearchRouteDto {
   @Type(() => PointDto)
   endCoords?: PointDto;
 
-  @IsOptional()
   @IsNumber()
   @Max(10000)
   @Type(() => Number)
-  maxDistance?: number;
+  maxDistance: number;
 
   @IsOptional()
   @IsDateString()
@@ -59,9 +57,6 @@ export class SearchRouteDto {
   @IsString()
   name?: string;
 
-  @IsOptional()
-  @IsString()
-  frequency?: string;
 
   @IsOptional()
   @IsNumber()

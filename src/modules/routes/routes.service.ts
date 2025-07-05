@@ -285,6 +285,7 @@ export class RoutesService {
     priceRange,
     status,
     date,
+    maxDistance = 5000,
   }: SearchRouteDto): any {
     const query: any = {};
 
@@ -298,12 +299,8 @@ export class RoutesService {
 
     if (priceRange) {
       query.price = {};
-      if (priceRange.min !== undefined) {
-        query.price.$gte = priceRange.min;
-      }
-      if (priceRange.max !== undefined) {
-        query.price.$lte = priceRange.max;
-      }
+      if (priceRange.min !== undefined) query.price.$gte = priceRange.min;
+      if (priceRange.max !== undefined) query.price.$lte = priceRange.max;
     }
 
     if (status) {
@@ -311,11 +308,18 @@ export class RoutesService {
     }
 
     if (date) {
-      query.startTime = {
-        $gte: new Date(date),
-        $lte: new Date(new Date(date).setHours(23, 59, 59)),
-      };
+      const start = new Date(date);
+      const end = new Date(date);
+      end.setHours(23, 59, 59, 999);
+
+      query.$or = [
+        { startTime: { $gte: start, $lte: end } },
+        { 'waypoints.estimatedArrivalTime': { $gte: start, $lte: end } },
+      ];
     }
+
+    // 🔍 Lọc theo khoảng cách tối đa tài xế cho phép
+    query.maxPickupDistance = { $gte: maxDistance };
 
     return query;
   }
@@ -327,44 +331,36 @@ export class RoutesService {
   }: SearchRouteDto): any[] {
     const geoConditions: any[] = [];
 
-    // Điều kiện cho startCoords
     if (startCoords) {
-      const geoWithinCondition = this.createGeoWithinCondition(
+      const geoWithin = this.createGeoWithinCondition(startCoords, maxDistance);
+      const geoIntersects = this.createGeoIntersectsCondition(
         startCoords,
         maxDistance,
       );
-      const geoIntersectsCondition = this.createGeoIntersectsCondition(
-        startCoords,
-        maxDistance,
-      );
-      const startConditions = {
+
+      geoConditions.push({
         $or: [
-          { startPoint: geoWithinCondition },
-          { 'waypoints.coordinates': geoWithinCondition },
-          { simplifiedPath: geoIntersectsCondition },
+          { startPoint: geoWithin },
+          { 'waypoints.coordinates': geoWithin },
+          { simplifiedPath: geoIntersects },
         ],
-      };
-      geoConditions.push(startConditions);
+      });
     }
 
-    // Điều kiện cho endCoords
     if (endCoords) {
-      const geoWithinCondition = this.createGeoWithinCondition(
+      const geoWithin = this.createGeoWithinCondition(endCoords, maxDistance);
+      const geoIntersects = this.createGeoIntersectsCondition(
         endCoords,
         maxDistance,
       );
-      const geoIntersectsCondition = this.createGeoIntersectsCondition(
-        endCoords,
-        maxDistance,
-      );
-      const endConditions = {
+
+      geoConditions.push({
         $or: [
-          { endPoint: geoWithinCondition },
-          { 'waypoints.coordinates': geoWithinCondition },
-          { simplifiedPath: geoIntersectsCondition },
+          { endPoint: geoWithin },
+          { 'waypoints.coordinates': geoWithin },
+          { simplifiedPath: geoIntersects },
         ],
-      };
-      geoConditions.push(endConditions);
+      });
     }
 
     return geoConditions;
