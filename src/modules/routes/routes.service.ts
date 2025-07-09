@@ -206,6 +206,7 @@ export class RoutesService {
             coordinates: [waypoint.location.lng, waypoint.location.lat],
             distance: waypoint.distance,
             name: waypoint.name,
+            estimatedArrivalTime: waypoint.estimatedArrivalTime ?? null, // cập nhật
           };
         }) || [];
 
@@ -1235,6 +1236,7 @@ export class RoutesService {
           coordinates: [waypoint.location.lng, waypoint.location.lat],
           distance: waypoint.distance,
           name: waypoint.name,
+          estimatedArrivalTime: waypoint.estimatedArrivalTime ?? null, // cập nhật
         };
       });
     }
