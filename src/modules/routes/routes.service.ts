@@ -244,6 +244,7 @@ export class RoutesService {
         duration,
         status: 'active',
         routeIndex,
+        isNegotiable: rest.isNegotiable ?? false,
       });
 
       return await route.save();

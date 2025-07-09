@@ -114,4 +114,8 @@ export class CreateRouteDto {
   @IsOptional()
   @Min(0)
   maxPickupDistance?: number;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  isNegotiable?: boolean;
 }

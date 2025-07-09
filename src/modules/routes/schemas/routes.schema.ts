@@ -102,6 +102,9 @@ export class Route {
   // 👤 Khoảng cách tối đa tài xế có thể rước người ngoài tuyến (tính bằng km)
   @Prop({ type: Number, default: 5 }) // ví dụ mặc định 5km
   maxPickupDistance: number;
+
+  @Prop({ default: false })
+  isNegotiable: boolean;
 }
 
 export const RouteSchema = SchemaFactory.createForClass(Route);
