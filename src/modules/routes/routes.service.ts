@@ -1074,8 +1074,9 @@ export class RoutesService {
       // 3. Gắn passengerCount cho mỗi request
       const enrichedRequests = await Promise.all(
         requests.map(async (req) => {
+          const route = req.routeId as any; // 👈 ép kiểu rõ ràng
           const passengerCount = await this.passengerModel.countDocuments({
-            routeId: req.routeId._id,
+            routeId: route._id, // ✅ bây giờ route._id là hợp lệ
           });
 
           return {
@@ -1330,5 +1331,24 @@ export class RoutesService {
     await this.requestModel.deleteMany({ routeId });
 
     return { message: 'Route deleted successfully' };
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT) // hoặc EVERY_DAY_AT_1AM
+  async expirePastRoutes(): Promise<void> {
+    const now = new Date();
+
+    const result = await this.routeModel.updateMany(
+      {
+        endTime: { $lt: now },
+        status: { $ne: 'expired' }, // Chỉ cập nhật những route chưa hết hạn
+      },
+      {
+        $set: { status: 'expired' },
+      },
+    );
+
+    console.log(
+      `✅ Đã cập nhật ${result.modifiedCount} tuyến đường hết hạn vào ${now.toISOString()}`,
+    );
   }
 }
