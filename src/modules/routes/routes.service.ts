@@ -265,20 +265,28 @@ export class RoutesService {
     return meters / this.EARTH_RADIUS_METERS;
   }
 
-  async search(searchRouteDto: SearchRouteDto): Promise<Route[]> {
+  async search(searchRouteDto: SearchRouteDto): Promise<any[]> {
     const query = this.buildQuery(searchRouteDto);
     const geoConditions = this.buildGeoConditions(searchRouteDto);
 
     if (geoConditions.length > 0) {
-      // Nếu có cả startCoords và endCoords, dùng $and; nếu không, dùng $or
       if (searchRouteDto.startCoords && searchRouteDto.endCoords) {
-        query.$and = geoConditions; // Yêu cầu cả hai nhóm điều kiện
-      } else {
-        query.$or = geoConditions; // Chỉ cần một nhóm điều kiện
+        query.$and = geoConditions;
       }
     }
 
-    return await this.routeModel.find(query).populate('userId').exec();
+    const routes = await this.routeModel.find(query).populate('userId').exec();
+
+    const routeWithPassengerCount = await Promise.all(
+      routes.map(async (route) => {
+        const count = await this.passengerModel.countDocuments({
+          routeId: route._id,
+        });
+        return { ...route.toObject(), passengerCount: count };
+      }),
+    );
+
+    return routeWithPassengerCount;
   }
 
   private buildQuery({
@@ -311,8 +319,7 @@ export class RoutesService {
 
     if (date) {
       const start = new Date(date);
-      const end = new Date(date);
-      end.setHours(23, 59, 59, 999);
+      const end = new Date(new Date(date).setHours(23, 59, 59));
 
       query.$or = [
         { startTime: { $gte: start, $lte: end } },
