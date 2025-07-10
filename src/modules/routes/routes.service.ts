@@ -1043,9 +1043,9 @@ export class RoutesService {
     return routes;
   }
 
-  async getRequestsByDriverId(driverId: string): Promise<Request[]> {
+  async getRequestsByDriverId(driverId: string): Promise<any[]> {
     try {
-      // Lấy tất cả route mà tài xế đã tạo
+      // 1. Lấy tất cả route mà tài xế đã tạo
       const routes = await this.routeModel
         .find({ userId: driverId }, { _id: 1 })
         .exec();
@@ -1058,7 +1058,7 @@ export class RoutesService {
 
       const routeIds = routes.map((route) => route._id);
 
-      // Lấy các request có routeId nằm trong các route tài xế đã tạo
+      // 2. Lấy các request có routeId thuộc danh sách route
       const requests = await this.requestModel
         .find({ routeId: { $in: routeIds } })
         .populate('userId', 'name email') // populate người gửi yêu cầu
@@ -1071,9 +1071,22 @@ export class RoutesService {
         );
       }
 
-      return requests;
+      // 3. Gắn passengerCount cho mỗi request
+      const enrichedRequests = await Promise.all(
+        requests.map(async (req) => {
+          const passengerCount = await this.passengerModel.countDocuments({
+            routeId: req.routeId._id,
+          });
+
+          return {
+            ...req.toObject(),
+            passengerCount,
+          };
+        }),
+      );
+
+      return enrichedRequests;
     } catch (error) {
-      // Nếu không phải lỗi do NotFoundException thì ném lỗi server
       if (error instanceof NotFoundException) {
         throw error;
       }
