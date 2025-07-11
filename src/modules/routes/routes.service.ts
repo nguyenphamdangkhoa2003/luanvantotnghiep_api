@@ -318,8 +318,11 @@ export class RoutesService {
     }
 
     if (date) {
-      const start = new Date(date);
-      const end = new Date(new Date(date).setHours(23, 59, 59));
+      const localStart = new Date(`${date}T00:00:00+07:00`);
+      const localEnd = new Date(`${date}T23:59:59+07:00`);
+
+      const start = new Date(localStart.toISOString());
+      const end = new Date(localEnd.toISOString()); 
 
       query.$or = [
         { startTime: { $gte: start, $lte: end } },
