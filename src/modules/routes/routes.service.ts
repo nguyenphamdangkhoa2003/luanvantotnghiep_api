@@ -295,8 +295,9 @@ export class RoutesService {
     priceRange,
     status,
     date,
-    maxDistance = 5000,
   }: SearchRouteDto): any {
+    // bỏ maxDistance ở đây
+
     const query: any = {};
 
     if (name) {
@@ -320,18 +321,13 @@ export class RoutesService {
     if (date) {
       const localStart = new Date(`${date}T00:00:00+07:00`);
       const localEnd = new Date(`${date}T23:59:59+07:00`);
-
       const start = new Date(localStart.toISOString());
-      const end = new Date(localEnd.toISOString()); 
-
+      const end = new Date(localEnd.toISOString());
       query.$or = [
         { startTime: { $gte: start, $lte: end } },
         { 'waypoints.estimatedArrivalTime': { $gte: start, $lte: end } },
       ];
     }
-
-    // 🔍 Lọc theo khoảng cách tối đa tài xế cho phép
-    query.maxPickupDistance = { $gte: maxDistance };
 
     return query;
   }
@@ -344,33 +340,77 @@ export class RoutesService {
     const geoConditions: any[] = [];
 
     if (startCoords) {
-      const geoWithin = this.createGeoWithinCondition(startCoords, maxDistance);
-      const geoIntersects = this.createGeoIntersectsCondition(
-        startCoords,
-        maxDistance,
-      );
-
       geoConditions.push({
         $or: [
-          { startPoint: geoWithin },
-          { 'waypoints.coordinates': geoWithin },
-          { simplifiedPath: geoIntersects },
+          {
+            startPoint: {
+              $geoWithin: {
+                $centerSphere: [
+                  [startCoords.lng, startCoords.lat],
+                  this.metersToRadians(maxDistance),
+                ],
+              },
+            },
+          },
+          {
+            'waypoints.coordinates': {
+              $geoWithin: {
+                $centerSphere: [
+                  [startCoords.lng, startCoords.lat],
+                  this.metersToRadians(maxDistance),
+                ],
+              },
+            },
+          },
+          {
+            simplifiedPath: {
+              $geoIntersects: {
+                $geometry: turf.circle(
+                  [startCoords.lng, startCoords.lat],
+                  (maxDistance + 3000 - 1000) / 1000, // cộng thêm như bạn muốn
+                  { steps: 64, units: 'kilometers' },
+                ).geometry,
+              },
+            },
+          },
         ],
       });
     }
 
     if (endCoords) {
-      const geoWithin = this.createGeoWithinCondition(endCoords, maxDistance);
-      const geoIntersects = this.createGeoIntersectsCondition(
-        endCoords,
-        maxDistance,
-      );
-
       geoConditions.push({
         $or: [
-          { endPoint: geoWithin },
-          { 'waypoints.coordinates': geoWithin },
-          { simplifiedPath: geoIntersects },
+          {
+            endPoint: {
+              $geoWithin: {
+                $centerSphere: [
+                  [endCoords.lng, endCoords.lat],
+                  this.metersToRadians(maxDistance),
+                ],
+              },
+            },
+          },
+          {
+            'waypoints.coordinates': {
+              $geoWithin: {
+                $centerSphere: [
+                  [endCoords.lng, endCoords.lat],
+                  this.metersToRadians(maxDistance),
+                ],
+              },
+            },
+          },
+          {
+            simplifiedPath: {
+              $geoIntersects: {
+                $geometry: turf.circle(
+                  [endCoords.lng, endCoords.lat],
+                  (maxDistance + 3000 - 1000) / 1000, // cộng thêm như bạn muốn
+                  { steps: 64, units: 'kilometers' },
+                ).geometry,
+              },
+            },
+          },
         ],
       });
     }
