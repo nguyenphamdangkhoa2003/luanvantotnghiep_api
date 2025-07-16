@@ -11,3 +11,7 @@ export const SLUG_REGEX = /^[a-z\d]+(?:(\.|-|_)[a-z\d]+)*$/;
 // validates if passwords are valid bcrypt hashes
 export const BCRYPT_HASH_OR_UNSET =
   /(UNSET|(\$2[abxy]?\$\d{1,2}\$[A-Za-z\d\./]{53}))/;
+
+export const CLOUDINARY_PUBLIC_ID_REGEX = /upload\/(?:v\d+\/)?([^./]+)(?:\.\w+)?$/;
+
+

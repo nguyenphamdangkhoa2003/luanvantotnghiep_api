@@ -1,15 +1,3 @@
-// src/modules/reviews/reviews.service.ts
-import {
-  Review,
-  ReviewDocument,
-} from '@/modules/reviews/schemas/review.schema';
-import { RequestDocument } from '@/modules/routes/schemas/request.schema';
-import { Route } from '@/modules/routes/schemas/routes.schema';
-import {
-  User,
-  UserDocument,
-  UserRole,
-} from '@/modules/users/schemas/user.schema';
 import {
   Injectable,
   BadRequestException,
@@ -18,14 +6,33 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
+import {
+  Review,
+  ReviewDocument,
+} from '@/modules/reviews/schemas/review.schema';
+import {
+  Request as TripRequest,
+  RequestDocument,
+} from '@/modules/routes/schemas/request.schema';
+import { Route } from '@/modules/routes/schemas/routes.schema';
+import {
+  User,
+  UserDocument,
+  UserRole,
+} from '@/modules/users/schemas/user.schema';
+
 @Injectable()
 export class ReviewsService {
   constructor(
     @InjectModel(Review.name) private reviewModel: Model<ReviewDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
-    @InjectModel(Request.name) private tripRequestModel: Model<RequestDocument>,
+    @InjectModel(TripRequest.name)
+    private tripRequestModel: Model<RequestDocument>,
   ) {}
 
+  /**
+   * Tạo đánh giá cho một chuyến đi sau khi hoàn tất
+   */
   async createReview(
     reviewerId: string,
     revieweeId: string,
@@ -34,34 +41,40 @@ export class ReviewsService {
     reviewType: 'customer' | 'driver',
     comment?: string,
   ) {
-    const tripRequest = (await this.tripRequestModel
+    // Lấy thông tin request và validate trạng thái hoàn tất
+    const tripRequest = await this.tripRequestModel
       .findById(tripRequestId)
-      .populate('routeId')) as any;
-    tripRequest.routeId = tripRequest.routeId as Route;
+      .populate<{ routeId: Route }>('routeId')
+      .lean();
+
     if (!tripRequest || tripRequest.status !== 'completed') {
       throw new BadRequestException('Invalid or incomplete trip');
     }
 
+    // Kiểm tra quyền đánh giá
     const isValidReviewer =
       (reviewType === UserRole.DRIVER &&
         tripRequest.routeId.userId.toString() === reviewerId) ||
       (reviewType === UserRole.CUSTOMER &&
         tripRequest.userId.toString() === reviewerId);
+
     if (!isValidReviewer) {
       throw new BadRequestException(
         'You are not authorized to rate this trip.',
       );
     }
 
+    // Kiểm tra đánh giá đã tồn tại chưa
     const existingReview = await this.reviewModel.findOne({
       reviewer: reviewerId,
       tripRequest: tripRequestId,
       reviewType,
     });
     if (existingReview) {
-      throw new BadRequestException('You have rated this trip');
+      throw new BadRequestException('You have already rated this trip');
     }
 
+    // Tạo đánh giá mới
     const review = await this.reviewModel.create({
       reviewer: reviewerId,
       reviewee: revieweeId,
@@ -71,9 +84,11 @@ export class ReviewsService {
       reviewType,
     });
 
+    // Cập nhật điểm trung bình cho người được đánh giá
     const reviews = await this.reviewModel.find({ reviewee: revieweeId });
     const averageRating =
       reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+
     await this.userModel.findByIdAndUpdate(revieweeId, {
       averageRating,
       ratingCount: reviews.length,
@@ -82,22 +97,26 @@ export class ReviewsService {
     return review;
   }
 
+  /**
+   * Kiểm tra người dùng đã đánh giá chuyến đi chưa
+   */
   async checkReviewStatus(
     reviewerId: string,
     tripRequestId: string,
   ): Promise<{ hasReviewed: boolean }> {
-    const tripRequest = (await this.tripRequestModel
+    const tripRequest = await this.tripRequestModel
       .findById(tripRequestId)
-      .populate('routeId')) as any;
+      .populate<{ routeId: Route }>('routeId')
+      .lean();
+
     if (!tripRequest) {
       throw new BadRequestException('Trip request not found');
     }
-    tripRequest.routeId = tripRequest.routeId as Route;
 
-    // Kiểm tra reviewerId hợp lệ
     const isValidReviewer =
       tripRequest.routeId.userId.toString() === reviewerId ||
       tripRequest.userId.toString() === reviewerId;
+
     if (!isValidReviewer) {
       throw new BadRequestException(
         'You are not authorized to check this review status.',
@@ -108,9 +127,13 @@ export class ReviewsService {
       reviewer: reviewerId,
       tripRequest: tripRequestId,
     });
+
     return { hasReviewed: !!existingReview };
   }
 
+  /**
+   * Lấy danh sách các đánh giá mà người dùng đã tạo
+   */
   async getReviewsGivenByUser(userId: string) {
     return this.reviewModel
       .find({ reviewer: userId })
@@ -119,6 +142,9 @@ export class ReviewsService {
       .exec();
   }
 
+  /**
+   * Lấy danh sách các đánh giá mà người dùng nhận được
+   */
   async getReviewsReceivedByUser(userId: string) {
     return this.reviewModel
       .find({ reviewee: userId })
@@ -127,16 +153,19 @@ export class ReviewsService {
       .exec();
   }
 
+  /**
+   * Lấy tất cả đánh giá trong hệ thống (dành cho admin)
+   */
   async getReviews() {
     try {
       const reviews = await this.reviewModel
         .find()
-        .populate('reviewer', 'name email avatar') // chỉ lấy các field cần thiết từ User
+        .populate('reviewer', 'name email avatar')
         .populate('reviewee', 'name email avatar')
-        .populate('tripRequest') // có thể populate toàn bộ hoặc chọn field (nếu cần)
+        .populate('tripRequest')
         .exec();
 
-      if (!reviews || reviews.length === 0) {
+      if (!reviews.length) {
         throw new InternalServerErrorException('No reviews found');
       }
 

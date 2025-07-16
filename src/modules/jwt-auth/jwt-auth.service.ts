@@ -1,3 +1,7 @@
+/**
+ * JwtAuthService - Quản lý toàn bộ logic tạo và xác thực JWT cho hệ thống
+ * Bao gồm: Access token, Refresh token, Confirmation token, Reset password token
+ */
 import {
   BadRequestException,
   Injectable,
@@ -24,6 +28,7 @@ import { User } from '@/modules/users/schemas/user.schema';
 import { ConfigService } from '@nestjs/config';
 import { IJwtConfig } from '@/config/interface/jwt-config.interface';
 import { JwtVerifyOptions } from '@nestjs/jwt';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class JwtAuthService {
@@ -41,6 +46,9 @@ export class JwtAuthService {
     this.domain = this.configService.get<string>('domain')!;
   }
 
+  /**
+   * Tạo JWT token bất đồng bộ (được sử dụng nội bộ)
+   */
   public async generateTokenAsync(
     payload: IAccessPayload | IEmailPayload | IRefreshPayload,
     secret: string,
@@ -52,6 +60,9 @@ export class JwtAuthService {
     });
   }
 
+  /**
+   * Xác thực JWT token bất đồng bộ (được sử dụng nội bộ)
+   */
   public async verifyTokenAsync<T extends object>(
     token: string,
     secret: string,
@@ -63,6 +74,9 @@ export class JwtAuthService {
     });
   }
 
+  /**
+   * Tạo token dựa theo loại token (access, refresh, confirmation, reset)
+   */
   public async generateToken(
     user: User,
     tokenType: TokenTypeEnum,
@@ -89,6 +103,7 @@ export class JwtAuthService {
             algorithm: 'RS256',
           }),
         );
+
       case TokenTypeEnum.REFRESH:
         const { secret: refreshSecret, time: refreshTime } =
           this.jwtConfig.refresh;
@@ -106,6 +121,7 @@ export class JwtAuthService {
             },
           ),
         );
+
       case TokenTypeEnum.CONFIRMATION:
       case TokenTypeEnum.RESET_PASSWORD:
         const { secret, time } = this.jwtConfig[tokenType];
@@ -122,6 +138,9 @@ export class JwtAuthService {
     }
   }
 
+  /**
+   * Xác thực token và xử lý lỗi nếu có (BadRequest, TokenExpired...)
+   */
   public async verifyToken<
     T extends IAccessToken | IRefreshToken | IEmailToken,
   >(token: string, tokenType: TokenTypeEnum): Promise<T> {
@@ -141,6 +160,7 @@ export class JwtAuthService {
           }),
           TokenTypeEnum.ACCESS,
         );
+
       case TokenTypeEnum.REFRESH:
       case TokenTypeEnum.CONFIRMATION:
       case TokenTypeEnum.RESET_PASSWORD:
@@ -156,6 +176,9 @@ export class JwtAuthService {
     }
   }
 
+  /**
+   * Helper xử lý lỗi và ném exception tương ứng khi xác thực token thất bại
+   */
   private static async throwBadRequest<
     T extends IAccessToken | IRefreshToken | IEmailToken,
   >(promise: Promise<T>, tokenType: TokenTypeEnum | string): Promise<T> {
@@ -181,6 +204,9 @@ export class JwtAuthService {
     }
   }
 
+  /**
+   * Tạo đồng thời cả access token và refresh token
+   */
   public async generateAuthTokens(
     user: User,
     domain?: string,

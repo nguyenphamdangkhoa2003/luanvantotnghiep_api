@@ -14,45 +14,56 @@ import { SignInDto } from '@/modules/auth/DTOs/sign-in.dto';
 export class LocalStrategy extends PassportStrategy(Strategy) {
   private readonly logger = new Logger(LocalStrategy.name);
 
-  constructor(private authService: AuthService) {
+  constructor(private readonly authService: AuthService) {
     super({
-      usernameField: 'emailOrUsername',
-      passwordField: 'password',
+      usernameField: 'emailOrUsername', // Tên trường người dùng gửi lên
+      passwordField: 'password', // Tên trường mật khẩu
     });
   }
 
+  /**
+   * Hàm validate được gọi tự động bởi Passport sau khi nhận thông tin đăng nhập.
+   * Dùng để kiểm tra dữ liệu đầu vào và xác thực người dùng.
+   *
+   * @param emailOrUsername - Email hoặc tên đăng nhập do người dùng cung cấp
+   * @param password - Mật khẩu do người dùng cung cấp
+   * @returns Thông tin người dùng nếu xác thực thành công
+   * @throws BadRequestException nếu dữ liệu không hợp lệ
+   * @throws UnauthorizedException nếu xác thực thất bại
+   */
   async validate(emailOrUsername: string, password: string): Promise<any> {
-    this.logger.log(`Validating user: ${emailOrUsername}`);
+    this.logger.log(`🔐 Đang xác thực người dùng: ${emailOrUsername}`);
 
-    // Tạo đối tượng SignInDto
-    const validateUserData = new SignInDto();
-    validateUserData.emailOrUsername = emailOrUsername;
-    validateUserData.password = password;
+    // Bước 1: Tạo DTO từ dữ liệu đăng nhập
+    const credentials = new SignInDto();
+    credentials.emailOrUsername = emailOrUsername;
+    credentials.password = password;
 
-    // Xác thực dữ liệu đầu vào
-    const errors = await validate(validateUserData);
+    // Bước 2: Validate dữ liệu đầu vào theo DTO
+    const errors = await validate(credentials);
     if (errors.length > 0) {
       const errorMessages = errors
-        .map((error) => {
-          if (error.constraints) {
-            return Object.values(error.constraints);
-          }
-          return ['Lỗi xác thực không xác định'];
-        })
-        .flat()
+        .flatMap((error) =>
+          error.constraints
+            ? Object.values(error.constraints)
+            : ['Lỗi không xác định'],
+        )
         .join(', ');
-      this.logger.warn(`Validation errors: ${errorMessages}`);
+
+      this.logger.warn(`⚠️ Lỗi validate: ${errorMessages}`);
       throw new BadRequestException(`Dữ liệu không hợp lệ: ${errorMessages}`);
     }
 
-    // Gọi AuthService để xác thực người dùng
-    const data = await this.authService.validateUser(validateUserData);
-    if (!data) {
-      this.logger.warn(`Authentication failed for ${emailOrUsername}`);
-      throw new UnauthorizedException('Xác thực không thành công!');
+    // Bước 3: Gọi AuthService để xác thực người dùng
+    const user = await this.authService.validateUser(credentials);
+    if (!user) {
+      this.logger.warn(`🚫 Xác thực thất bại: ${emailOrUsername}`);
+      throw new UnauthorizedException(
+        'Email/Tài khoản hoặc mật khẩu không đúng.',
+      );
     }
 
-    this.logger.log(`User ${emailOrUsername} validated successfully`);
-    return data;
+    this.logger.log(`✅ Xác thực thành công: ${emailOrUsername}`);
+    return user;
   }
 }

@@ -11,7 +11,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { MembershipService } from './membership.service';
-import { AuthGuard } from '@nestjs/passport';
 import { PurchaseMembershipDto } from '@/modules/membership/DTOs/purchase-membership.dto';
 import { AuthRequest } from '@/types';
 import { Public } from '@/modules/auth/decorators/public.decorators';

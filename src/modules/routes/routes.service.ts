@@ -136,6 +136,14 @@ export class RoutesService {
       'mapbox_access_token',
     );
   }
+  /**
+   * Đơn giản hóa đường đi (path) để giảm số lượng điểm và tối ưu lưu trữ
+   * Sử dụng thuật toán Ramer–Douglas–Peucker
+   *
+   * @param coordinates - Mảng các tọa độ dạng [lng, lat]
+   * @param tolerance - Mức độ cho phép sai lệch, càng nhỏ thì giữ càng nhiều điểm
+   * @returns Mảng tọa độ sau khi được đơn giản hóa
+   */
   private simplifyPath(
     coordinates: [number, number][],
     tolerance: number = 0.001,
@@ -145,6 +153,17 @@ export class RoutesService {
     return simplified.map((p) => [p.x, p.y]);
   }
 
+  /**
+   * Tài xế tạo tuyến đường mới, bao gồm:
+   * - Kiểm tra trùng thời gian với tuyến đang hoạt động
+   * - Đơn giản hoá path nếu có
+   * - Ghi nhận thông tin tuyến vào database
+   *
+   * @param userId - ID người tạo tuyến
+   * @param createRouteDto - Dữ liệu tuyến nhập vào từ client
+   * @returns Tuyến đường đã được lưu
+   * @throws BadRequestException nếu có xung đột tuyến hoặc dữ liệu không hợp lệ
+   */
   async create(userId: string, createRouteDto: CreateRouteDto): Promise<Route> {
     try {
       const {
@@ -162,22 +181,20 @@ export class RoutesService {
         ...rest
       } = createRouteDto;
 
+      // 🔍 Kiểm tra trùng thời gian với các tuyến đang hoạt động
       const conflictRoute = await this.routeModel.findOne({
         userId,
-        status: 'active', // chỉ kiểm tra với tuyến đang hoạt động
+        status: 'active',
         $or: [
           {
-            // startTime của tuyến mới nằm trong khoảng thời gian của tuyến cũ
             startTime: { $lte: startTime },
             endTime: { $gte: startTime },
           },
           {
-            // endTime của tuyến mới nằm trong khoảng thời gian của tuyến cũ
             startTime: { $lte: endTime },
             endTime: { $gte: endTime },
           },
           {
-            // Tuyến mới bao trùm tuyến cũ
             startTime: { $gte: startTime },
             endTime: { $lte: endTime },
           },
@@ -190,7 +207,7 @@ export class RoutesService {
         );
       }
 
-      // Ánh xạ WaypointDto sang Waypoint
+      // 🧭 Map waypoint từ DTO sang schema
       const mappedWaypoints =
         waypoints?.map((waypoint) => {
           if (
@@ -202,15 +219,16 @@ export class RoutesService {
               'Waypoint location phải có lng và lat hợp lệ',
             );
           }
+
           return {
             coordinates: [waypoint.location.lng, waypoint.location.lat],
             distance: waypoint.distance,
             name: waypoint.name,
-            estimatedArrivalTime: waypoint.estimatedArrivalTime ?? null, // cập nhật
+            estimatedArrivalTime: waypoint.estimatedArrivalTime ?? null,
           };
         }) || [];
 
-      // Tạo simplifiedPath nếu path tồn tại
+      // 🔽 Đơn giản hoá path nếu có
       let simplifiedPath = path;
       if (path?.coordinates) {
         simplifiedPath = {
@@ -219,11 +237,13 @@ export class RoutesService {
             path.coordinates as [number, number][],
           ),
         };
+
         console.log(
           `Path reduced from ${path.coordinates.length} to ${simplifiedPath.coordinates.length} points`,
         );
       }
 
+      // 📦 Tạo route mới
       const route = new this.routeModel({
         userId,
         ...rest,
@@ -261,22 +281,34 @@ export class RoutesService {
     }
   }
 
+  /**
+   * Chuyển đổi khoảng cách từ mét sang radian cho truy vấn MongoDB geospatial
+   */
   private metersToRadians(meters: number): number {
     return meters / this.EARTH_RADIUS_METERS;
   }
 
+  /**
+   * Tìm kiếm tuyến xe dựa vào vị trí, thời gian, trạng thái, ghế trống, tên tuyến, v.v.
+   * Bao gồm cả điều kiện geo-location và query text
+   */
   async search(searchRouteDto: SearchRouteDto): Promise<any[]> {
     const query = this.buildQuery(searchRouteDto);
     const geoConditions = this.buildGeoConditions(searchRouteDto);
 
-    if (geoConditions.length > 0) {
-      if (searchRouteDto.startCoords && searchRouteDto.endCoords) {
-        query.$and = geoConditions;
-      }
+    // Gộp điều kiện tìm kiếm địa lý vào query nếu có
+    if (
+      geoConditions.length > 0 &&
+      searchRouteDto.startCoords &&
+      searchRouteDto.endCoords
+    ) {
+      query.$and = geoConditions;
     }
 
+    // Tìm các tuyến phù hợp và lấy thông tin người tạo tuyến
     const routes = await this.routeModel.find(query).populate('userId').exec();
 
+    // Gắn số lượng hành khách đã đặt vào từng tuyến
     const routeWithPassengerCount = await Promise.all(
       routes.map(async (route) => {
         const count = await this.passengerModel.countDocuments({
@@ -289,6 +321,9 @@ export class RoutesService {
     return routeWithPassengerCount;
   }
 
+  /**
+   * Xây dựng điều kiện filter tuyến từ các tham số tìm kiếm text
+   */
   private buildQuery({
     name,
     seatsAvailable,
@@ -296,8 +331,6 @@ export class RoutesService {
     status,
     date,
   }: SearchRouteDto): any {
-    // bỏ maxDistance ở đây
-
     const query: any = {};
 
     if (name) {
@@ -319,10 +352,12 @@ export class RoutesService {
     }
 
     if (date) {
+      // Lọc theo ngày bắt đầu hoặc điểm đến trong waypoints
       const localStart = new Date(`${date}T00:00:00+07:00`);
       const localEnd = new Date(`${date}T23:59:59+07:00`);
       const start = new Date(localStart.toISOString());
       const end = new Date(localEnd.toISOString());
+
       query.$or = [
         { startTime: { $gte: start, $lte: end } },
         { 'waypoints.estimatedArrivalTime': { $gte: start, $lte: end } },
@@ -332,6 +367,10 @@ export class RoutesService {
     return query;
   }
 
+  /**
+   * Xây dựng điều kiện tìm kiếm không gian (theo geo location)
+   * Sử dụng $geoWithin (vòng tròn) và $geoIntersects (với simplifiedPath)
+   */
   private buildGeoConditions({
     startCoords,
     endCoords,
@@ -340,36 +379,32 @@ export class RoutesService {
     const geoConditions: any[] = [];
 
     if (startCoords) {
+      const radius = this.metersToRadians(maxDistance);
+      const center = [startCoords.lng, startCoords.lat];
+
       geoConditions.push({
         $or: [
           {
             startPoint: {
               $geoWithin: {
-                $centerSphere: [
-                  [startCoords.lng, startCoords.lat],
-                  this.metersToRadians(maxDistance),
-                ],
+                $centerSphere: [center, radius],
               },
             },
           },
           {
             'waypoints.coordinates': {
               $geoWithin: {
-                $centerSphere: [
-                  [startCoords.lng, startCoords.lat],
-                  this.metersToRadians(maxDistance),
-                ],
+                $centerSphere: [center, radius],
               },
             },
           },
           {
             simplifiedPath: {
               $geoIntersects: {
-                $geometry: turf.circle(
-                  [startCoords.lng, startCoords.lat],
-                  (maxDistance + 3000 - 1000) / 1000, // cộng thêm như bạn muốn
-                  { steps: 64, units: 'kilometers' },
-                ).geometry,
+                $geometry: turf.circle(center, (maxDistance + 2000) / 1000, {
+                  steps: 64,
+                  units: 'kilometers',
+                }).geometry,
               },
             },
           },
@@ -378,36 +413,32 @@ export class RoutesService {
     }
 
     if (endCoords) {
+      const radius = this.metersToRadians(maxDistance);
+      const center = [endCoords.lng, endCoords.lat];
+
       geoConditions.push({
         $or: [
           {
             endPoint: {
               $geoWithin: {
-                $centerSphere: [
-                  [endCoords.lng, endCoords.lat],
-                  this.metersToRadians(maxDistance),
-                ],
+                $centerSphere: [center, radius],
               },
             },
           },
           {
             'waypoints.coordinates': {
               $geoWithin: {
-                $centerSphere: [
-                  [endCoords.lng, endCoords.lat],
-                  this.metersToRadians(maxDistance),
-                ],
+                $centerSphere: [center, radius],
               },
             },
           },
           {
             simplifiedPath: {
               $geoIntersects: {
-                $geometry: turf.circle(
-                  [endCoords.lng, endCoords.lat],
-                  (maxDistance + 3000 - 1000) / 1000, // cộng thêm như bạn muốn
-                  { steps: 64, units: 'kilometers' },
-                ).geometry,
+                $geometry: turf.circle(center, (maxDistance + 2000) / 1000, {
+                  steps: 64,
+                  units: 'kilometers',
+                }).geometry,
               },
             },
           },
@@ -416,37 +447,6 @@ export class RoutesService {
     }
 
     return geoConditions;
-  }
-
-  private createGeoWithinCondition(
-    coords: { lng: number; lat: number },
-    maxDistance: number,
-  ): any {
-    return {
-      $geoWithin: {
-        $centerSphere: [
-          [coords.lng, coords.lat],
-          this.metersToRadians(maxDistance),
-        ],
-      },
-    };
-  }
-
-  private createGeoIntersectsCondition(
-    coords: { lng: number; lat: number },
-    maxDistance: number,
-  ): any {
-    const center = [coords.lng, coords.lat];
-    const radius = maxDistance / 1000; // Chuyển sang km
-    const circle = turf.circle(center, radius, {
-      steps: 64,
-      units: 'kilometers',
-    });
-    return {
-      $geoIntersects: {
-        $geometry: circle.geometry, // GeoJSON Polygon
-      },
-    };
   }
 
   async requestRoute(

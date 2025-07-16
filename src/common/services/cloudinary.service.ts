@@ -1,10 +1,22 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
+import {
+  v2 as cloudinary,
+  UploadApiResponse,
+  UploadApiOptions,
+} from 'cloudinary';
 import { ConfigService } from '@nestjs/config';
+import { promisify } from 'util';
+import { CLOUDINARY_PUBLIC_ID_REGEX } from '@/common/constants/regex.constant';
 
 @Injectable()
 export class CloudinaryService {
+  // Sử dụng promisify để chuyển từ callback sang Promise cho upload_stream
+  private readonly uploadStream = promisify(
+    cloudinary.uploader.upload_stream.bind(cloudinary.uploader),
+  );
+
   constructor(private readonly configService: ConfigService) {
+    // Cấu hình Cloudinary với thông tin từ biến môi trường
     cloudinary.config({
       cloud_name: this.configService.get<string>('cloudinary.name'),
       api_key: this.configService.get<string>('cloudinary.api_key'),
@@ -12,37 +24,61 @@ export class CloudinaryService {
     });
   }
 
+  /**
+   * Tải lên file từ buffer lên Cloudinary bằng cách sử dụng upload_stream.
+   *
+   * @param file - File tải lên từ Multer (Express)
+   * @param options - Các tùy chọn upload (ví dụ: folder, public_id,...)
+   * @returns Kết quả phản hồi từ Cloudinary sau khi upload
+   * @throws BadRequestException nếu upload thất bại
+   */
   async uploadFile(
     file: Express.Multer.File,
-    options: any = {},
+    options: UploadApiOptions = {},
   ): Promise<UploadApiResponse> {
     try {
-      const result = await new Promise<UploadApiResponse>((resolve, reject) => {
-        cloudinary.uploader
-          .upload_stream(options, (error, result) => {
-            if (error) return reject(error);
-            if (!result)
-              return reject(new Error('Upload failed, no result returned'));
-            resolve(result);
-          })
-          .end(file.buffer);
-      });
+      const result = await this.uploadStream(
+        { ...options, resource_type: options.resource_type ?? 'auto' },
+        file.buffer,
+      );
       return result;
     } catch (error) {
       throw new BadRequestException(
-        `Failed to upload file to Cloudinary: ${error.message}`,
+        `Failed to upload file to Cloudinary: ${error?.message || error}`,
       );
     }
   }
 
+  /**
+   * Trích xuất publicId từ một URL Cloudinary.
+   *
+   * @param url - URL đầy đủ của file trên Cloudinary
+   * @returns publicId nếu trích xuất thành công, ngược lại trả về null
+   */
   getPublicIdFromUrl(url: string): string | null {
-    const matches = url.match(/upload\/(?:v\d+\/)?(.+?)(?:\.\w+)?$/);
+    const matches = url.match(CLOUDINARY_PUBLIC_ID_REGEX);
     return matches ? matches[1] : null;
   }
 
-  async deleteFile(publicId: string, resourceType: string): Promise<void> {
-    await cloudinary.uploader.destroy(publicId, {
-      resource_type: resourceType,
-    });
+  /**
+   * Xóa file trên Cloudinary bằng publicId và loại tài nguyên.
+   *
+   * @param publicId - ID duy nhất của file cần xóa trên Cloudinary
+   * @param resourceType - Loại tài nguyên: 'image', 'video', 'raw', mặc định là 'image'
+   * @throws BadRequestException nếu xóa thất bại
+   */
+  async deleteFile(
+    publicId: string,
+    resourceType: string = 'image',
+  ): Promise<void> {
+    try {
+      await cloudinary.uploader.destroy(publicId, {
+        resource_type: resourceType,
+      });
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to delete file from Cloudinary: ${error?.message || error}`,
+      );
+    }
   }
 }

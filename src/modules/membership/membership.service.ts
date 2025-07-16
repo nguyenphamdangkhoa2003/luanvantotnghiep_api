@@ -21,102 +21,82 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Model, Types } from 'mongoose';
-
 @Injectable()
 export class MembershipService {
   constructor(
     @InjectModel(Membership.name)
     private membershipModel: Model<MembershipDocument>,
+
     @InjectModel(Package.name)
     private packageModel: Model<PackageDocument>,
+
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
+
     private vnPayService: VnPayService,
   ) {}
 
-  // Admin: Get all packages
+  /**
+   * Admin - Lấy toàn bộ danh sách gói thành viên
+   */
   async getAllPackages() {
     return this.packageModel.find().exec();
   }
 
-  // Admin: Create new package
+  /**
+   * Admin - Tạo gói thành viên mới
+   */
   async createPackage(dto: CreatePackageDto) {
-    const existingPackage = await this.packageModel
-      .findOne({ name: dto.name })
-      .exec();
-    if (existingPackage) {
-      throw new BadRequestException('Package name already exists');
-    }
+    const exists = await this.packageModel.findOne({ name: dto.name }).exec();
+    if (exists) throw new BadRequestException('Tên gói đã tồn tại');
 
-    const newPackage = await this.packageModel.create({
-      name: dto.name,
-      acceptRequests: dto.acceptRequests,
-      price: dto.price,
-      durationDays: dto.durationDays,
-      description: dto.description,
-    });
-
-    return newPackage;
+    return this.packageModel.create(dto);
   }
 
-  // Admin: Update package
+  /**
+   * Admin - Cập nhật gói thành viên theo tên
+   */
   async updatePackage(packageName: string, dto: UpdatePackageDto) {
-    const packageDoc = await this.packageModel
+    const exists = await this.packageModel
       .findOne({ name: packageName })
       .exec();
-    if (!packageDoc) {
-      throw new NotFoundException('Package not found');
-    }
+    if (!exists) throw new NotFoundException('Không tìm thấy gói');
 
-    const updatedPackage = await this.packageModel
-      .findOneAndUpdate(
-        { name: packageName },
-        { $set: { ...dto } },
-        { new: true },
-      )
+    return this.packageModel
+      .findOneAndUpdate({ name: packageName }, { $set: dto }, { new: true })
       .exec();
-
-    return updatedPackage;
   }
 
-  // Admin: Delete package
+  /**
+   * Admin - Xóa gói thành viên nếu không có thành viên nào đang dùng
+   */
   async deletePackage(packageName: string) {
-    const packageDoc = await this.packageModel
-      .findOne({ name: packageName })
-      .exec();
-    if (!packageDoc) {
-      throw new NotFoundException('Package not found');
-    }
+    const pkg = await this.packageModel.findOne({ name: packageName }).exec();
+    if (!pkg) throw new NotFoundException('Không tìm thấy gói');
 
-    // Check if any active memberships use this package
-    const activeMemberships = await this.membershipModel.countDocuments({
+    const inUse = await this.membershipModel.countDocuments({
       packageType: packageName,
       status: 'active',
     });
 
-    if (activeMemberships > 0) {
-      throw new ForbiddenException(
-        'Cannot delete package with active memberships',
-      );
-    }
+    if (inUse > 0)
+      throw new ForbiddenException('Gói đang có người dùng, không thể xóa');
 
     await this.packageModel.findOneAndDelete({ name: packageName }).exec();
-
-    return { message: 'Package deleted successfully' };
+    return { message: 'Đã xóa gói thành công' };
   }
 
+  /**
+   * Người dùng mua gói thành viên → tạo URL thanh toán VNPay
+   */
   async purchaseMembership(userId: string, dto: PurchaseMembershipDto) {
-    const packageDoc = await this.packageModel
-      .findOne({
-        name: dto.packageType,
-      })
+    const pkg = await this.packageModel
+      .findOne({ name: dto.packageType })
       .exec();
-    if (!packageDoc) {
-      throw new BadRequestException('Invalid package type');
-    }
+    if (!pkg) throw new BadRequestException('Gói không hợp lệ');
 
     const paymentUrl = await this.vnPayService.createPaymentUrl({
-      amount: packageDoc.price,
+      amount: pkg.price,
       orderId: `MEMBERSHIP_${userId}_${Date.now()}`,
       orderInfo: `Purchase ${dto.packageType} membership`,
       userId,
@@ -125,37 +105,34 @@ export class MembershipService {
     return { paymentUrl };
   }
 
+  /**
+   * Xử lý callback từ VNPay sau khi thanh toán thành công
+   */
   async handleVnpayCallback(vnpayData: any) {
     const isValid = await this.vnPayService.verifyCallback(vnpayData);
-    if (!isValid) {
-      throw new BadRequestException('Invalid payment callback');
-    }
+    if (!isValid)
+      throw new BadRequestException('Callback thanh toán không hợp lệ');
 
-    const txnRefParts = vnpayData.vnp_TxnRef.split('_');
-    const userId = txnRefParts[1];
+    const [_, userId] = vnpayData.vnp_TxnRef.split('_');
     const packageType = vnpayData.vnp_OrderInfo.match(
       /Purchase (\w+) membership/,
-    )[1];
+    )?.[1];
+    if (!packageType)
+      throw new BadRequestException('Không tìm thấy loại gói trong callback');
 
-    const packageDoc = await this.packageModel
-      .findOne({
-        name: packageType,
-      })
-      .exec();
-    if (!packageDoc) {
-      throw new BadRequestException('Invalid package type');
-    }
+    const pkg = await this.packageModel.findOne({ name: packageType }).exec();
+    if (!pkg) throw new BadRequestException('Gói không hợp lệ');
 
     const startDate = new Date();
     const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + packageDoc.durationDays);
+    endDate.setDate(startDate.getDate() + pkg.durationDays);
 
     const membership = await this.membershipModel.create({
       userId,
       packageType,
-      acceptRequests: packageDoc.acceptRequests,
-      price: packageDoc.price,
-      durationDays: packageDoc.durationDays,
+      acceptRequests: pkg.acceptRequests,
+      price: pkg.price,
+      durationDays: pkg.durationDays,
       startDate,
       endDate,
       status: 'active',
@@ -166,7 +143,7 @@ export class MembershipService {
       {
         currentMembership: {
           packageType,
-          remainingRequests: packageDoc.acceptRequests,
+          remainingRequests: pkg.acceptRequests,
           endDate,
         },
       },
@@ -175,44 +152,43 @@ export class MembershipService {
     return membership;
   }
 
+  /**
+   * Lấy thông tin gói thành viên hiện tại của người dùng
+   */
   async getMembershipInfo(userId: string) {
     const user = await this.userModel.findById(userId).exec();
     return user?.currentMembership || null;
   }
 
+  /**
+   * Admin - Lấy toàn bộ danh sách membership (dùng populate)
+   */
   async findAll(): Promise<Membership[]> {
     const memberships = await this.membershipModel
       .find()
-      .populate('userId') // Lấy chi tiết user từ reference
+      .populate('userId')
       .exec();
-
-    if (!memberships || memberships.length === 0) {
-      throw new NotFoundException('No membership packages found.');
+    if (!memberships.length) {
+      throw new NotFoundException('Không có gói thành viên nào');
     }
-
     return memberships;
   }
 
+  /**
+   * Tìm gói thành viên hiện tại theo userId
+   */
   async findActiveByUserId(userId: string): Promise<Membership | null> {
-    return this.membershipModel
-      .findOne({
-        userId: userId.toString(),
-      })
-      .exec();
+    return this.membershipModel.findOne({ userId: userId.toString() }).exec();
   }
 
+  /**
+   * Cron job chạy mỗi ngày để cập nhật trạng thái membership hết hạn
+   */
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async updateExpiredMemberships(): Promise<void> {
-    const currentDate = new Date();
-
     await this.membershipModel.updateMany(
-      {
-        endDate: { $lt: currentDate },
-        status: 'active',
-      },
-      {
-        $set: { status: 'expired' },
-      },
+      { endDate: { $lt: new Date() }, status: 'active' },
+      { $set: { status: 'expired' } },
     );
   }
 }
