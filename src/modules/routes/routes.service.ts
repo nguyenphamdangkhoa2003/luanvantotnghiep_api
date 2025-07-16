@@ -294,33 +294,56 @@ export class RoutesService {
    */
   async search(searchRouteDto: SearchRouteDto): Promise<any[]> {
     const query = this.buildQuery(searchRouteDto);
-    const geoConditions = this.buildGeoConditions(searchRouteDto);
+    const geoConditions = this.buildOptimizedGeoConditions(searchRouteDto);
 
-    // Gộp điều kiện tìm kiếm địa lý vào query nếu có
-    if (
-      geoConditions.length > 0 &&
-      searchRouteDto.startCoords &&
-      searchRouteDto.endCoords
-    ) {
+    if (geoConditions.length > 0) {
       query.$and = geoConditions;
     }
 
-    // Tìm các tuyến phù hợp và lấy thông tin người tạo tuyến
     const routes = await this.routeModel.find(query).populate('userId').exec();
 
-    // Gắn số lượng hành khách đã đặt vào từng tuyến
-    const routeWithPassengerCount = await Promise.all(
+    const results = await Promise.all(
       routes.map(async (route) => {
-        const count = await this.passengerModel.countDocuments({
+        const passengerCount = await this.passengerModel.countDocuments({
           routeId: route._id,
         });
-        return { ...route.toObject(), passengerCount: count };
+
+        const pickupDistance = this.computePointToLineDistance(
+          searchRouteDto.startCoords,
+          route.simplifiedPath,
+        );
+        const dropoffDistance = this.computePointToLineDistance(
+          searchRouteDto.endCoords,
+          route.simplifiedPath,
+        );
+
+        const totalAllowed =
+          (searchRouteDto.maxDistance || 0) + (route.maxPickupDistance || 0);
+
+        if (
+          pickupDistance * 1000 <= totalAllowed &&
+          dropoffDistance * 1000 <= totalAllowed
+        ) {
+          return {
+            ...route.toObject(),
+            passengerCount,
+          };
+        }
+        return null;
       }),
     );
 
-    return routeWithPassengerCount;
+    return results.filter(Boolean);
   }
-
+  private computePointToLineDistance(
+    coords: { lng: number; lat: number } | undefined,
+    path: { coordinates: [number, number][] } | undefined,
+  ): number {
+    if (!coords || !path?.coordinates?.length) return Infinity;
+    const pt = turf.point([coords.lng, coords.lat]);
+    const line = turf.lineString(path.coordinates);
+    return turf.pointToLineDistance(pt, line, { units: 'kilometers' }); // trả về km
+  }
   /**
    * Xây dựng điều kiện filter tuyến từ các tham số tìm kiếm text
    */
@@ -371,78 +394,41 @@ export class RoutesService {
    * Xây dựng điều kiện tìm kiếm không gian (theo geo location)
    * Sử dụng $geoWithin (vòng tròn) và $geoIntersects (với simplifiedPath)
    */
-  private buildGeoConditions({
+  private buildOptimizedGeoConditions({
     startCoords,
     endCoords,
     maxDistance = 5000,
   }: SearchRouteDto): any[] {
+    const maxGlobalPickup = 10000;
+    const searchRadius = maxDistance + maxGlobalPickup;
+
     const geoConditions: any[] = [];
 
     if (startCoords) {
-      const radius = this.metersToRadians(maxDistance);
-      const center = [startCoords.lng, startCoords.lat];
-
       geoConditions.push({
-        $or: [
-          {
-            startPoint: {
-              $geoWithin: {
-                $centerSphere: [center, radius],
-              },
-            },
+        simplifiedPath: {
+          $geoIntersects: {
+            $geometry: turf.circle(
+              [startCoords.lng, startCoords.lat],
+              searchRadius / 1000,
+              { steps: 64, units: 'kilometers' },
+            ).geometry,
           },
-          {
-            'waypoints.coordinates': {
-              $geoWithin: {
-                $centerSphere: [center, radius],
-              },
-            },
-          },
-          {
-            simplifiedPath: {
-              $geoIntersects: {
-                $geometry: turf.circle(center, (maxDistance + 2000) / 1000, {
-                  steps: 64,
-                  units: 'kilometers',
-                }).geometry,
-              },
-            },
-          },
-        ],
+        },
       });
     }
 
     if (endCoords) {
-      const radius = this.metersToRadians(maxDistance);
-      const center = [endCoords.lng, endCoords.lat];
-
       geoConditions.push({
-        $or: [
-          {
-            endPoint: {
-              $geoWithin: {
-                $centerSphere: [center, radius],
-              },
-            },
+        simplifiedPath: {
+          $geoIntersects: {
+            $geometry: turf.circle(
+              [endCoords.lng, endCoords.lat],
+              searchRadius / 1000,
+              { steps: 64, units: 'kilometers' },
+            ).geometry,
           },
-          {
-            'waypoints.coordinates': {
-              $geoWithin: {
-                $centerSphere: [center, radius],
-              },
-            },
-          },
-          {
-            simplifiedPath: {
-              $geoIntersects: {
-                $geometry: turf.circle(center, (maxDistance + 2000) / 1000, {
-                  steps: 64,
-                  units: 'kilometers',
-                }).geometry,
-              },
-            },
-          },
-        ],
+        },
       });
     }
 
