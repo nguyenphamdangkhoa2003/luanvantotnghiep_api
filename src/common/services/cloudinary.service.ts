@@ -36,17 +36,23 @@ export class CloudinaryService {
     file: Express.Multer.File,
     options: UploadApiOptions = {},
   ): Promise<UploadApiResponse> {
-    try {
-      const result = await this.uploadStream(
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
         { ...options, resource_type: options.resource_type ?? 'auto' },
-        file.buffer,
+        (error, result) => {
+          if (error) {
+            return reject(
+              new BadRequestException(
+                `Failed to upload file to Cloudinary: ${error.message}`,
+              ),
+            );
+          }
+          resolve(result as UploadApiResponse);
+        },
       );
-      return result;
-    } catch (error) {
-      throw new BadRequestException(
-        `Failed to upload file to Cloudinary: ${error?.message || error}`,
-      );
-    }
+
+      uploadStream.end(file.buffer); // Ghi buffer vào stream
+    });
   }
 
   /**
