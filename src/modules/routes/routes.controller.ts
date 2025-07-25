@@ -13,13 +13,18 @@ import { AuthRequest } from '@/types';
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
+  Query,
   Req,
-  UseGuards
+  UseGuards,
 } from '@nestjs/common';
 import { RoutesService } from './routes.service';
 
@@ -162,5 +167,16 @@ export class RoutesController {
   @Delete(':id')
   async deleteRoute(@Req() req: AuthRequest, @Param('id') routeId: string) {
     return this.routesService.deleteRoute(req.user._id.toString(), routeId);
+  }
+
+  @Public()
+  @Post('seed')
+  @HttpCode(HttpStatus.CREATED)
+  async seedRoutes(
+    @Query('count', new DefaultValuePipe(10), ParseIntPipe)
+    count: number,
+  ): Promise<{ message: string }> {
+    await this.routesService.seedFakeRoutes(count);
+    return { message: `Đã tạo thành công ${count} route ảo.` };
   }
 }

@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { promisify } from 'util';
 import { CLOUDINARY_PUBLIC_ID_REGEX } from '@/common/constants/regex.constant';
+import { Readable } from 'stream';
 
 @Injectable()
 export class CloudinaryService {
@@ -36,17 +37,22 @@ export class CloudinaryService {
     file: Express.Multer.File,
     options: UploadApiOptions = {},
   ): Promise<UploadApiResponse> {
-    try {
-      const result = await this.uploadStream(
-        { ...options, resource_type: options.resource_type ?? 'auto' },
-        file.buffer,
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          ...options,
+          resource_type: options.resource_type ?? 'auto',
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          return resolve(result as UploadApiResponse);
+        },
       );
-      return result;
-    } catch (error) {
-      throw new BadRequestException(
-        `Failed to upload file to Cloudinary: ${error?.message || error}`,
-      );
-    }
+
+      // Tạo một stream từ buffer
+      const readable = Readable.from(file.buffer);
+      readable.pipe(uploadStream); // Gửi dữ liệu lên Cloudinary
+    });
   }
 
   /**

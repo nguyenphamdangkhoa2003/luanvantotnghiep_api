@@ -103,44 +103,47 @@ export class UsersService {
   public async findOrCreate(data: CreateUserDto): Promise<User> {
     const formattedEmail = data.email.toLowerCase();
 
-    // Tìm người dùng với email và populate oauthProviders
+    // 1. Tìm người dùng theo email
     let user = await this.userModel
       .findOne({ email: formattedEmail })
       .populate('oauthProviders')
       .exec();
+
+    // 2. Nếu chưa có user, tạo mới cùng provider
     if (!user) {
       return this.create(data.provider, { ...data });
     }
 
-    const hasProvider = user.oauthProviders.some(
-      (p: OAuthProvider) => p.provider === data.provider,
-    );
+    // 3. Kiểm tra provider đã tồn tại trong DB chưa (không dùng .some để tránh lỗi duplicate)
+    const existingProvider = await this.oauthProviderModel.findOne({
+      provider: data.provider,
+      user: user._id,
+    });
 
-    if (!hasProvider) {
-      // Thêm provider mới nếu chưa có
+    // 4. Nếu chưa có provider này, tạo mới
+    if (!existingProvider) {
       await this.createOAuthProvider(data.provider, user._id.toString());
-      // Refresh user để cập nhật oauthProviders
-      user = await this.userModel
-        .findOne({ email: formattedEmail })
-        .populate('oauthProviders')
-        .exec();
+      // Không cần populate lại nếu không cần dùng oauthProviders sau đó
     }
 
+    // 5. Cập nhật dữ liệu người dùng nếu có dữ liệu mới
     const updatedData: Partial<User> = {
       ...data,
-      updatedAt: new Date(), // Cập nhật thời gian sửa đổi
+      updatedAt: new Date(),
     };
 
-    // Cập nhật người dùng trong database
     user = await this.userModel
       .findOneAndUpdate(
         { email: formattedEmail },
         { $set: updatedData },
-        { new: true, runValidators: true }, // Trả về document mới và chạy validator
+        { new: true, runValidators: true },
       )
       .populate('oauthProviders')
       .exec();
+
+    // 6. Kiểm tra tồn tại lần cuối (optional nếu bạn cần báo lỗi khi không tồn tại)
     await this.commonService.checkEntityExistence(user, User.name);
+
     return user!;
   }
 
@@ -518,7 +521,6 @@ export class UsersService {
         { new: true, runValidators: true },
       )
       .select('email driverLicense identityDocument');
-
 
     const emailSubject = `${type === 'driverLicense' ? 'Driver License' : 'Identity Document'} Verification ${
       isApproved ? 'Approved' : 'Rejected'

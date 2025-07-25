@@ -50,74 +50,7 @@ export class RoutesService {
   private readonly mapboxAccessToken: string;
   private readonly REQUEST_EXPIRY_DAYS = 7;
   private readonly EARTH_RADIUS_METERS = 6378100;
-  private readonly locations: Location[] = [
-    { name: 'Hà Nội', coordinates: [105.8342, 21.0278] },
-    { name: 'TP Hồ Chí Minh', coordinates: [106.6297, 10.8231] },
-    { name: 'Đà Nẵng', coordinates: [108.2068, 16.0472] },
-    { name: 'Huế', coordinates: [107.5898, 16.4637] },
-    { name: 'Cần Thơ', coordinates: [105.7747, 10.0386] },
-    { name: 'Nha Trang', coordinates: [109.1942, 12.2451] },
-    { name: 'Hải Phòng', coordinates: [106.6881, 20.8449] },
-    { name: 'Vũng Tàu', coordinates: [107.0843, 10.346] },
-    { name: 'Đà Lạt', coordinates: [108.4419, 11.9404] },
-    { name: 'Quảng Ninh', coordinates: [107.0571, 20.9517] },
-    { name: 'An Giang', coordinates: [105.4352, 10.5215] },
-    { name: 'Bà Rịa - Vũng Tàu', coordinates: [107.1688, 10.4963] },
-    { name: 'Bắc Giang', coordinates: [106.1947, 21.2731] },
-    { name: 'Bắc Kạn', coordinates: [105.8403, 22.147] },
-    { name: 'Bạc Liêu', coordinates: [105.7244, 9.294] },
-    { name: 'Bắc Ninh', coordinates: [106.0502, 21.1861] },
-    { name: 'Bến Tre', coordinates: [106.3756, 10.2415] },
-    { name: 'Bình Định', coordinates: [109.2335, 13.782] },
-    { name: 'Bình Dương', coordinates: [106.677, 11.152] },
-    { name: 'Bình Phước', coordinates: [106.8934, 11.5379] },
-    { name: 'Bình Thuận', coordinates: [108.1021, 10.9289] },
-    { name: 'Cà Mau', coordinates: [105.1524, 9.1768] },
-    { name: 'Cao Bằng', coordinates: [106.2524, 22.666] },
-    { name: 'Đắk Lắk', coordinates: [108.2378, 12.71] },
-    { name: 'Đắk Nông', coordinates: [107.6097, 12.264] },
-    { name: 'Điện Biên', coordinates: [103.0167, 21.386] },
-    { name: 'Đồng Nai', coordinates: [107.1007, 10.9574] },
-    { name: 'Đồng Tháp', coordinates: [105.6877, 10.4938] },
-    { name: 'Gia Lai', coordinates: [108.269, 13.8079] },
-    { name: 'Hà Giang', coordinates: [104.9836, 22.8233] },
-    { name: 'Hà Nam', coordinates: [105.9122, 20.5835] },
-    { name: 'Hà Tĩnh', coordinates: [105.9057, 18.3428] },
-    { name: 'Hải Dương', coordinates: [106.333, 20.941] },
-    { name: 'Hậu Giang', coordinates: [105.6413, 9.7579] },
-    { name: 'Hòa Bình', coordinates: [105.3383, 20.8172] },
-    { name: 'Hưng Yên', coordinates: [106.0672, 20.8526] },
-    { name: 'Khánh Hòa', coordinates: [109.1927, 12.2584] },
-    { name: 'Kiên Giang', coordinates: [105.1259, 10.0124] },
-    { name: 'Kon Tum', coordinates: [108.0133, 14.6612] },
-    { name: 'Lai Châu', coordinates: [103.4371, 22.3857] },
-    { name: 'Lâm Đồng', coordinates: [108.4587, 11.5753] },
-    { name: 'Lạng Sơn', coordinates: [106.6291, 21.8537] },
-    { name: 'Lào Cai', coordinates: [103.9743, 22.4832] },
-    { name: 'Long An', coordinates: [106.4111, 10.6987] },
-    { name: 'Nam Định', coordinates: [106.1753, 20.42] },
-    { name: 'Nghệ An', coordinates: [105.6927, 19.2342] },
-    { name: 'Ninh Bình', coordinates: [105.9747, 20.2581] },
-    { name: 'Ninh Thuận', coordinates: [108.9929, 11.6739] },
-    { name: 'Phú Thọ', coordinates: [105.2221, 21.3992] },
-    { name: 'Phú Yên', coordinates: [109.296, 13.0882] },
-    { name: 'Quảng Bình', coordinates: [106.6222, 17.4651] },
-    { name: 'Quảng Nam', coordinates: [108.019, 15.879] },
-    { name: 'Quảng Ngãi', coordinates: [108.7992, 15.1214] },
-    { name: 'Quảng Trị', coordinates: [107.2007, 16.7943] },
-    { name: 'Sóc Trăng', coordinates: [105.974, 9.6025] },
-    { name: 'Sơn La', coordinates: [103.909, 21.327] },
-    { name: 'Tây Ninh', coordinates: [106.1314, 11.31] },
-    { name: 'Thái Bình', coordinates: [106.34, 20.5381] },
-    { name: 'Thái Nguyên', coordinates: [105.8252, 21.5672] },
-    { name: 'Thanh Hóa', coordinates: [105.7799, 19.8072] },
-    { name: 'Tiền Giang', coordinates: [106.3602, 10.4493] },
-    { name: 'Trà Vinh', coordinates: [106.3439, 9.9347] },
-    { name: 'Tuyên Quang', coordinates: [105.2613, 21.8194] },
-    { name: 'Vĩnh Long', coordinates: [105.972, 10.2537] },
-    { name: 'Vĩnh Phúc', coordinates: [105.5987, 21.3089] },
-    { name: 'Yên Bái', coordinates: [104.8752, 21.7049] },
-  ];
+
   constructor(
     @InjectModel(TripConfirmation.name)
     private readonly tripConfirmationModel: Model<TripConfirmationDocument>,
@@ -293,6 +226,7 @@ export class RoutesService {
    * Bao gồm cả điều kiện geo-location và query text
    */
   async search(searchRouteDto: SearchRouteDto): Promise<any[]> {
+    console.time('search');
     const query = this.buildQuery(searchRouteDto);
     const geoConditions = this.buildOptimizedGeoConditions(searchRouteDto);
 
@@ -332,6 +266,7 @@ export class RoutesService {
         return null;
       }),
     );
+    console.timeEnd('search'); // sẽ log: search: 123.45ms
 
     return results.filter(Boolean);
   }
@@ -577,7 +512,6 @@ export class RoutesService {
           });
           await passenger.save({ session });
 
-          // ✅ Tạo TripConfirmation
           await this.tripConfirmationModel.create(
             [
               {
@@ -909,154 +843,117 @@ export class RoutesService {
 
   //================================ *** SEED DATA *** ================================
 
-  private async getRouteData(
-    start: [number, number],
-    end: [number, number],
-    waypoints: [number, number][] = [],
-    retries = 3,
-  ): Promise<{ distance: number; duration: number; path: [number, number][] }> {
-    if (!this.mapboxAccessToken) {
-      throw new Error('Mapbox Access Token is missing');
-    }
-
-    const coordinates = [start, ...waypoints, end]
-      .map((coord) => `${coord[0]},${coord[1]}`)
-      .join(';');
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&access_token=${this.mapboxAccessToken}`;
-
-    for (let i = 0; i < retries; i++) {
-      try {
-        const response = await axios.get(url);
-        const route = response.data.routes[0];
-        if (!route) {
-          throw new Error('No routes found in Mapbox response');
-        }
-        return {
-          distance: route.distance / 1000, // km
-          duration: route.duration, // giây
-          path: route.geometry.coordinates as [number, number][],
-        };
-      } catch (error) {
-        if (error.response?.status === 401) {
-          throw new Error(
-            'Mapbox API: Unauthorized - Invalid or missing access token',
-          );
-        }
-        if (error.response?.status === 429 && i < retries - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          continue;
-        }
-        throw new Error(`Mapbox API error: ${error.message}`);
+  async seedFakeRoutes(count: number): Promise<void> {
+    try {
+      const users = await this.userModel.find().select('_id').lean();
+      if (!users.length) {
+        throw new Error('Chưa có user nào để gán route');
       }
+
+      const docs: Partial<Route>[] = [];
+
+      for (let i = 0; i < count; i++) {
+        const user = users[faker.number.int({ min: 0, max: users.length - 1 })];
+
+        // 1. Tạo điểm start/end
+        const startLat = faker.number.float({
+          min: 10.6,
+          max: 10.9,
+          fractionDigits: 4,
+        });
+        const startLng = faker.number.float({
+          min: 106.5,
+          max: 106.9,
+          fractionDigits: 4,
+        });
+        const endLat = faker.number.float({
+          min: 10.6,
+          max: 10.9,
+          fractionDigits: 4,
+        });
+        const endLng = faker.number.float({
+          min: 106.5,
+          max: 106.9,
+          fractionDigits: 4,
+        });
+
+        const startPt = turf.point([startLng, startLat]);
+        const endPt = turf.point([endLng, endLat]);
+        const distKm = turf.distance(startPt, endPt, { units: 'kilometers' });
+        const durationSec = (distKm / 30) * 3600;
+
+        // 2. Tạo path và spline
+        const rawLine = turf.lineString([
+          [startLng, startLat],
+          [endLng, endLat],
+        ]);
+        const pathGeo = turf.bezierSpline(rawLine, { sharpness: 0.7 });
+
+        // 3. Simplify path đúng cách
+        const rawCoords = turf.getCoords(pathGeo) as [number, number][];
+        const ptsForSimplify = rawCoords.map(([lng, lat]) => ({
+          x: lng,
+          y: lat,
+        }));
+        const simplifiedPts = simplify(ptsForSimplify, 0.0001, true);
+        const simplifiedCoords = simplifiedPts.length
+          ? simplifiedPts.map((p) => [p.x, p.y] as [number, number])
+          : rawCoords; // fallback nếu simplify trả về rỗng
+
+        // 4. Sinh waypoint
+        const numWP = faker.number.int({ min: 0, max: 3 });
+        const waypoints = Array.from({ length: numWP }).map(() => {
+          const frac = faker.number.float({
+            min: 0.1,
+            max: 0.9,
+            fractionDigits: 2,
+          });
+          const pt = turf.along(rawLine, frac * distKm, {
+            units: 'kilometers',
+          });
+          const [lng, lat] = turf.getCoords(pt) as [number, number];
+          return {
+            name: faker.location.city(), // dùng module location
+            distance: parseFloat((frac * distKm).toFixed(2)),
+            coordinates: [lng, lat] as [number, number],
+            estimatedArrivalTime: new Date(
+              Date.now() + frac * durationSec * 1000,
+            ),
+          };
+        });
+
+        // 5. Thời gian bắt đầu + kết thúc
+        const startTime = faker.date.soon({ days: 30 });
+        const endTime = new Date(startTime.getTime() + durationSec * 1000);
+
+        docs.push({
+          userId: user._id.toString(),
+          name: faker.company.catchPhrase(),
+          startPoint: { type: 'Point', coordinates: [startLng, startLat] },
+          endPoint: { type: 'Point', coordinates: [endLng, endLat] },
+          path: { type: 'LineString', coordinates: rawCoords },
+          simplifiedPath: { type: 'LineString', coordinates: simplifiedCoords },
+          distance: parseFloat(distKm.toFixed(2)),
+          duration: Math.round(durationSec),
+          startTime,
+          endTime,
+          seatsAvailable: faker.number.int({ min: 1, max: 7 }),
+          price: faker.number.int({ min: 50, max: 200 }) * 1000,
+          status: 'active',
+          routeIndex: i,
+          waypoints,
+          maxPickupDistance: 5,
+          isNegotiable: faker.datatype.boolean(),
+        });
+      }
+
+      await this.routeModel.insertMany(docs);
+      console.log(`✅ Đã tạo xong ${count} routes ảo.`);
+    } catch (err) {
+      console.error(err);
+      throw new InternalServerErrorException('Seed routes thất bại');
     }
-    throw new Error('Mapbox API: Max retries reached');
   }
-
-  // private async generateRoute(index: number): Promise<Route> {
-  //   const startLocation = this.getRandomItem(this.locations);
-  //   let endLocation = this.getRandomItem(this.locations);
-  //   while (endLocation.name === startLocation.name) {
-  //     endLocation = this.getRandomItem(this.locations);
-  //   }
-
-  //   // Chọn 0-2 waypoints ngẫu nhiên
-  //   const waypointCount = faker.number.int({ min: 0, max: 2 });
-  //   const waypointLocations: Location[] = [];
-  //   for (let i = 0; i < waypointCount; i++) {
-  //     let waypoint = this.getRandomItem(this.locations);
-  //     while (
-  //       waypoint.name === startLocation.name ||
-  //       waypoint.name === endLocation.name ||
-  //       waypointLocations.some((w) => w.name === waypoint.name)
-  //     ) {
-  //       waypoint = this.getRandomItem(this.locations);
-  //     }
-  //     waypointLocations.push(waypoint);
-  //   }
-
-  //   // Lấy dữ liệu từ Mapbox
-  //   const { distance, duration, path } = await this.getRouteData(
-  //     startLocation.coordinates,
-  //     endLocation.coordinates,
-  //     waypointLocations.map((w) => w.coordinates),
-  //   );
-
-  //   // Tạo waypoints cho schema
-  //   let totalDistance = 0;
-  //   const waypointData = waypointLocations.map((loc, idx) => {
-  //     totalDistance +=
-  //       idx === 0
-  //         ? distance / (waypointCount + 1)
-  //         : distance / (waypointCount + 1);
-  //     return {
-  //       coordinates: loc.coordinates,
-  //       distance: totalDistance,
-  //       name: loc.name,
-  //     };
-  //   });
-
-  //   // Sinh các giá trị khác
-  //   const price = Math.round(
-  //     distance * faker.number.int({ min: 500, max: 1000 }),
-  //   ); // 500-1000 VND/km
-  //   const seatsAvailable = faker.number.int({ min: 10, max: 50 });
-  //   const frequency = faker.helpers.arrayElement([
-  //     'daily',
-  //     'weekly',
-  //     'monthly',
-  //   ]);
-  //   const startTime = faker.date.soon({ days: 30 });
-
-  //   return {
-  //     userId: faker.database.mongodbObjectId(),
-  //     name: `${startLocation.name} - ${endLocation.name}`,
-  //     startPoint: { type: 'Point', coordinates: startLocation.coordinates },
-  //     endPoint: { type: 'Point', coordinates: endLocation.coordinates },
-  //     waypoints: waypointData,
-  //     path: { type: 'LineString', coordinates: path },
-  //     simplifiedPath: {
-  //       type: 'LineString',
-  //       coordinates: [startLocation.coordinates, endLocation.coordinates],
-  //     },
-  //     distance,
-  //     duration,
-  //     frequency,
-  //     startTime,
-  //     seatsAvailable,
-  //     price,
-  //     status: 'active',
-  //     routeIndex: index,
-  //   };
-  // }
-
-  // Chọn ngẫu nhiên phần tử từ mảng
-  private getRandomItem<T>(array: T[]): T {
-    return array[Math.floor(Math.random() * array.length)];
-  }
-
-  // Tạo 1000 tuyến đường
-  // async generateRoutes(count: number = 1000): Promise<{ message: string }> {
-  //   const batchSize = 100;
-  //   const routes: Route[] = [];
-
-  //   for (let i = 0; i < count; i++) {
-  //     const route = await this.generateRoute(i + 1);
-  //     routes.push(route);
-
-  //     // Chèn theo batch
-  //     if (routes.length === batchSize || i === count - 1) {
-  //       try {
-  //         await this.routeModel.insertMany(routes, { ordered: false });
-  //         console.log(`Đã chèn ${i + 1} tuyến đường`);
-  //       } catch (error) {
-  //         console.error(`Lỗi khi chèn batch ${i + 1}:`, error);
-  //       }
-  //       routes.length = 0; // Xóa batch
-  //     }
-  //   }
-
-  //   return { message: `Đã tạo ${count} tuyến đường thành công` };
-  // }
 
   //================================ *** SEED DATA *** ================================
 
