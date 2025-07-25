@@ -34,26 +34,26 @@ export class CloudinaryService {
    * @throws BadRequestException nếu upload thất bại
    */
   async uploadFile(
-    file: Express.Multer.File,
-    options: UploadApiOptions = {},
-  ): Promise<UploadApiResponse> {
-    return new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          ...options,
-          resource_type: options.resource_type ?? 'auto',
-        },
-        (error, result) => {
-          if (error) return reject(error);
-          return resolve(result as UploadApiResponse);
-        },
-      );
+  file: Express.Multer.File,
+  options: UploadApiOptions = {},
+): Promise<UploadApiResponse> {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        ...options,
+        resource_type: options.resource_type ?? 'auto',
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        return resolve(result as UploadApiResponse);
+      },
+    );
 
-      // Tạo một stream từ buffer
-      const readable = Readable.from(file.buffer);
-      readable.pipe(uploadStream); // Gửi dữ liệu lên Cloudinary
-    });
-  }
+    // Tạo một stream từ buffer
+    const readable = Readable.from(file.buffer);
+    readable.pipe(uploadStream); // Gửi dữ liệu lên Cloudinary
+  });
+}
 
   /**
    * Trích xuất publicId từ một URL Cloudinary.
